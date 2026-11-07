@@ -10,6 +10,8 @@
 
 <p align="center"><b>Your Jellyfin library, the way a console would show it.</b></p>
 
+<p align="center"><a href="https://nagilordy.github.io/Rollback/">Website</a> · <a href="https://nagilordy.github.io/Rollback/download">Download</a> · <a href="https://nagilordy.github.io/Rollback/guide/getting-started">Guide</a></p>
+
 Rollback is a couch-first app for **Jellyfin**: full-screen artwork, big readable menus, made for a
 **controller** but just as good with a mouse and keyboard. It plays your original files straight
 from your server, in the best quality your screen can show, **4K, HDR and Dolby Vision included**.
