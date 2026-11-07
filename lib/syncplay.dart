@@ -143,6 +143,7 @@ class SyncPlay {
   bool isHost = false; // this Rollback opened the room (it keeps time)
   String? _mySession;
   List<String> _peers = [];
+  Set<String> _peerUsers = {}; // the Jellyfin user ids behind _peers (who may send to this room)
   DateTime _peersAt = DateTime(0);
   final _directIn = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get directMessages => _directIn.stream;
@@ -179,14 +180,16 @@ class SyncPlay {
     final people = group.value?.people.toSet() ?? <String>{};
     try {
       final list = await jf.getPath('/Sessions?controllableByUserId=${jf.userId}&activeWithinSeconds=900');
-      _peers = [
+      final peers = [
         for (final s in (list as List))
           if (SyncPlay.clientNames.contains(s['Client']) &&
               s['Id']?.toString() != _mySession &&
               s['DeviceId']?.toString() != Jellyfin.deviceId &&
               people.contains(s['UserName']?.toString()))
-            s['Id'].toString(),
+            s,
       ];
+      _peers = [for (final s in peers) s['Id'].toString()];
+      _peerUsers = {for (final s in peers) if (s['UserId'] != null) s['UserId'].toString()};
       _peersAt = DateTime.now();
     } catch (e) {
       debugPrint('Together: could not find the other Rollbacks: $e');
@@ -197,9 +200,10 @@ class SyncPlay {
   /// Sends a message to every other Rollback in the room.
   Future<void> sendDirect(Map<String, dynamic> message, {bool freshPeers = false}) async {
     final peers = await _roomPeers(fresh: freshPeers);
+    // The room's id goes with every message, so a message can't act on another room.
     final body = {
       'Name': 'SendString',
-      'Arguments': {'String': '$_prefix${jsonEncode(message)}'},
+      'Arguments': {'String': '$_prefix${jsonEncode({...message, 'g': group.value?.id})}'},
     };
     for (final id in peers) {
       jf.postPath('/Sessions/$id/Command', body).then((_) {}, onError: (e) {
@@ -312,12 +316,39 @@ class SyncPlay {
         final args = d is Map ? d['Arguments'] : null;
         final text = args is Map ? args['String']?.toString() : null;
         if (text != null && text.startsWith(_prefix)) {
+          Object? decoded;
           try {
-            final msg = (jsonDecode(text.substring(_prefix.length)) as Map).cast<String, dynamic>();
-            _directIn.add(msg);
+            decoded = jsonDecode(text.substring(_prefix.length));
           } catch (_) {}
+          final from = d is Map ? d['ControllingUserId']?.toString() : null;
+          unawaited(_receiveDirect(decoded, from));
         }
     }
+  }
+
+  // A message from another Rollback in the room, only if it is one: well formed (see
+  // validDirectMessage), for this room, and from someone in it. Anything else is dropped.
+  Future<void> _receiveDirect(Object? raw, String? from) async {
+    final room = group.value;
+    final msg = validDirectMessage(raw);
+    if (room == null || msg == null) {
+      if (raw != null) log('instant: dropped a malformed message');
+      return;
+    }
+    // Copies from before the room id was added send none; they still have to pass the rest.
+    final g = msg['g'];
+    if (g != null && g != room.id) {
+      log('instant: dropped a message for another room');
+      return;
+    }
+    if (from != null && from.isNotEmpty && from != jf.userId && !_peerUsers.contains(from)) {
+      await _roomPeers(fresh: true); // someone who just joined
+      if (!_peerUsers.contains(from)) {
+        log('instant: dropped a message from someone not in this room');
+        return;
+      }
+    }
+    if (group.value?.id == room.id) _directIn.add(msg);
   }
 
   void _onUpdate(Map<String, dynamic> u) {
@@ -486,6 +517,50 @@ class SyncPlay {
 }
 
 // ---------- Starting and joining ----------
+
+/// A watch-party message from another Rollback, checked: one of the known kinds, with each
+/// value of the right type and within sensible limits, keeping only the known fields. Null if
+/// it isn't one (other apps' strings, a newer kind this version doesn't know, a broken one).
+Map<String, dynamic>? validDirectMessage(Object? raw) {
+  if (raw is! Map) return null;
+  final t = raw['t'];
+  const kinds = {'state', 'tick', 'hello', 'wait', 'away', 'bye'};
+  if (t is! String || !kinds.contains(t)) return null;
+  final out = <String, dynamic>{'t': t};
+  // Positions in seconds (a day at most), times in server milliseconds.
+  bool number(String k, {double min = 0, double max = double.infinity, bool required = false}) {
+    final v = raw[k];
+    if (v == null) return !required;
+    if (v is! num || !v.isFinite || v < min || v > max) return false;
+    out[k] = v;
+    return true;
+  }
+
+  bool flag(String k, {bool required = false}) {
+    final v = raw[k];
+    if (v == null) return !required;
+    if (v is! bool) return false;
+    out[k] = v;
+    return true;
+  }
+
+  bool text(String k, {int max = 64}) {
+    final v = raw[k];
+    if (v == null) return true;
+    if (v is! String || v.length > max) return false;
+    out[k] = v;
+    return true;
+  }
+
+  final ok = number('pos', max: 86400, required: t == 'state' || t == 'tick') &&
+      number('at', min: 1, required: t == 'state' || t == 'tick') &&
+      flag('playing', required: t == 'state') &&
+      flag('on', required: t == 'wait') &&
+      text('by') &&
+      text('what', max: 16) &&
+      text('g', max: 128);
+  return ok ? out : null;
+}
 
 String _friendly(Object e) {
   final t = errorText(e);
