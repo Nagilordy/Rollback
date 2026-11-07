@@ -95,6 +95,11 @@ class SyncPlay {
     }
   }
 
+  // Where this PC last saw the room's video, when it was closed (instant channel: the server
+  // never hears those plays and pauses, so its start position is where the video first began).
+  // Opening the same video again starts here; anyone still watching corrects it right away.
+  ({String itemId, double pos})? lastSeen;
+
   Future<void> setIgnoreWait(bool ignore) => jf
       .postPath('/SyncPlay/SetIgnoreWait', {'IgnoreWait': ignore})
       .then((_) {}, onError: (e) => log('ignore-wait failed: $e'));
@@ -395,6 +400,7 @@ class SyncPlay {
     group.value = null;
     queue = null;
     _followed = null;
+    lastSeen = null;
     try {
       await jf.postPath('/SyncPlay/Leave');
     } catch (_) {}
@@ -424,6 +430,7 @@ class SyncPlay {
 
   Future<void> play(String itemId, int startTicks) async {
     queue = null;
+    lastSeen = null;
     await jf.postPath('/SyncPlay/SetNewQueue', {
       'PlayingQueue': [itemId],
       'PlayingItemPosition': 0,
@@ -605,8 +612,10 @@ Future<void> _pushRoomPlayer(NavigatorState nav, Jellyfin jf, SyncPlay sync) asy
   if (now == null) return;
   sync._followed = now.playlistItemId;
   final item = await jf.item(now.itemId, fresh: true);
+  final seen = sync.lastSeen;
+  final start = seen != null && seen.itemId == now.itemId && seen.pos > 0 ? (seen.pos * 10000000).round() : now.startTicks;
   await nav.push(MaterialPageRoute(
-    builder: (_) => playerScreen(jf, item, sync: sync, playlistItemId: now.playlistItemId, startTicks: now.startTicks),
+    builder: (_) => playerScreen(jf, item, sync: sync, playlistItemId: now.playlistItemId, startTicks: start),
   ));
 }
 
@@ -1843,6 +1852,14 @@ class DirectFollower extends RoomLink {
     // Closing the video doesn't leave the party. If this Rollback kept time, someone still
     // watching takes over.
     if (!handingOver && sync.isHost) sync.sendDirect({'t': 'away', 'by': _me});
+    // Opening it again starts where it was (see SyncPlay.lastSeen).
+    if (_settled) {
+      var pos = 0.0;
+      try {
+        pos = position();
+      } catch (_) {}
+      sync.lastSeen = (itemId: itemId, pos: pos > 0 ? pos : _roomPos);
+    }
   }
 
   // ----- your presses: instant here, then to everyone -----
