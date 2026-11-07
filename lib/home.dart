@@ -19,7 +19,7 @@ import 'images.dart';
 import 'phone.dart';
 import 'downloads.dart' show Downloads, DownloadsScreen;
 import 'profiles.dart' show ProfileChip, ProfileStore, WhoScreen, showProfileMenu, accentFor;
-import 'syncplay.dart' show TogetherPill, startWatchTogether, watchTogetherButton, playOrParty;
+import 'syncplay.dart' show TogetherPill, playOrParty;
 import 'ui.dart';
 
 // ---------- Look (shared with the other screens, see ui.dart) ----------
@@ -626,16 +626,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ]),
               ),
             ),
-            if (item['Type'] != 'Series') ...[
-              const SizedBox(width: 16),
-              Focusable(
-                onSelect: () => startWatchTogether(context, jf, item),
-                onFocus: (viaMouse) {
-                  if (!viaMouse) _setHero(true);
-                },
-                builder: watchTogetherButton,
-              ),
-            ],
             if (progress > 0) ...[
               const SizedBox(width: 26),
               Container(
@@ -659,7 +649,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ---------- Phone layout ----------
   //
-  // Upright: the artwork fills the top of the screen with the title, Resume and Watch together
+  // Upright: the artwork fills the top of the screen with the title and Resume
   // over its bottom edge, then the rows. Sideways: the TV layout re-sized for a phone, artwork
   // across the whole screen with the title on the left and the first row peeking in at the
   // bottom. Everything scrolls with a finger; pull down at the top to refresh.
@@ -886,7 +876,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final details = [year, _qualityLine(item)].where((s) => s.isNotEmpty).join(' · ');
     final progress = _progress(item);
     final label = item['Type'] == 'Series' ? 'Open' : (progress > 0 ? 'Resume' : 'Play');
-    final party = item['Type'] != 'Series';
 
     final play = PhoneButton(
       primary: true,
@@ -894,16 +883,6 @@ class _HomeScreenState extends State<HomeScreen> {
       icon: Icons.play_arrow_rounded,
       height: upright ? 52 : 46,
       onTap: () => _open(item),
-    );
-    final together = PhoneButton(
-      icon: Icons.people_alt_outlined,
-      label: upright ? null : 'Watch together',
-      semanticLabel: 'Watch together',
-      height: upright ? 52 : 46,
-      onTap: () async {
-        await startWatchTogether(context, jf, item);
-        _phoneBack();
-      },
     );
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
@@ -934,7 +913,6 @@ class _HomeScreenState extends State<HomeScreen> {
       SizedBox(height: upright ? 16 : 14),
       Row(children: [
         if (upright) Expanded(child: play) else play,
-        if (party) ...[const SizedBox(width: 10), together],
       ]),
       if (progress > 0) ...[
         const SizedBox(height: 12),

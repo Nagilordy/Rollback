@@ -1,4 +1,4 @@
-// The movie page: full artwork, title logo, what it's about, and Play / Watch together.
+// The movie page: full artwork, title logo, what it's about, and Play (for the party when in one).
 // Same look as the show page. Opened from a library, from Recently added on Home, and from
 // anywhere else a movie is picked to see more than just play it.
 
@@ -10,7 +10,7 @@ import 'images.dart';
 import 'main.dart' show Jellyfin;
 import 'phone.dart';
 import 'downloads.dart' show DownloadButton, Downloads, downloadTag;
-import 'syncplay.dart' show SyncPlay, playOrParty, startWatchTogether, watchTogetherButton;
+import 'syncplay.dart' show SyncPlay, playOrParty;
 import 'ui.dart';
 
 class MovieScreen extends StatefulWidget {
@@ -233,13 +233,6 @@ class _MovieScreenState extends State<MovieScreen> {
                             builder: (f) => _pill('From the beginning', f, icon: Icons.replay_rounded),
                           ),
                         ],
-                        if (!inParty) ...[
-                          const SizedBox(width: 16),
-                          Focusable(
-                            onSelect: () => startWatchTogether(context, jf, movie),
-                            builder: watchTogetherButton,
-                          ),
-                        ],
                         const SizedBox(width: 16),
                         Focusable(
                           onSelect: _toggleWatched,
@@ -274,7 +267,7 @@ class _MovieScreenState extends State<MovieScreen> {
   // ---------- Phone layout ----------
   //
   // Upright: the artwork at the top, then the logo, details, Play (Resume) across the width,
-  // Watch together and Mark watched under it, the summary (tap for all of it) and the cast.
+  // Mark watched under it, the summary (tap for all of it) and the cast.
   // Sideways: the TV page re-sized for a phone, artwork across the screen and everything on
   // the left, scrolling if it doesn't fit.
 
@@ -316,15 +309,6 @@ class _MovieScreenState extends State<MovieScreen> {
     final playLabel = inParty ? 'Play for the party' : (progress > 0 ? 'Resume · ${minutesLeft(movie)} min left' : 'Play');
     final play = PhoneButton(
         primary: true, label: playLabel, icon: Icons.play_arrow_rounded, height: upright ? 52 : 44, onTap: _play);
-    final together = PhoneButton(
-      label: 'Watch together',
-      icon: Icons.people_alt_outlined,
-      height: upright ? 48 : 44,
-      onTap: () async {
-        await startWatchTogether(context, jf, movie);
-        if (mounted) phoneAnyOrientation();
-      },
-    );
     final mark = PhoneButton(
       label: upright ? (_markNote ?? (watched ? 'Watched' : 'Mark watched')) : null,
       semanticLabel: watched ? 'Watched: tap to mark not watched' : 'Mark watched',
@@ -501,11 +485,7 @@ class _MovieScreenState extends State<MovieScreen> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 play,
                 const SizedBox(height: 10),
-                Row(children: [
-                  Expanded(child: together),
-                  const SizedBox(width: 10),
-                  Expanded(child: mark),
-                ]),
+                mark,
                 if (progress > 0) ...[
                   const SizedBox(height: 10),
                   fromStart,
@@ -560,7 +540,6 @@ class _MovieScreenState extends State<MovieScreen> {
                     const SizedBox(height: 14),
                     Wrap(spacing: 10, runSpacing: 10, children: [
                       play,
-                      together,
                       mark,
                       if (progress > 0) fromStart,
                     ]),

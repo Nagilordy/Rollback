@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'main.dart' show Jellyfin;
-import 'syncplay.dart' show startWatchTogether, watchTogetherButton, playOrParty;
+import 'syncplay.dart' show playOrParty;
 import 'gamepad.dart' show PadHint, PadButton, PadHints, fullScreenHint;
 import 'images.dart';
 import 'movie.dart' show MovieScreen;
@@ -1617,17 +1617,6 @@ class _ShowScreenState extends State<ShowScreen> {
                     ),
                     const SizedBox(width: 16),
                     Focusable(
-                      onFocus: (viaMouse) {
-                        if (!viaMouse) _setHero(true);
-                      },
-                      onSelect: () {
-                        final target = _next ?? (_episodes.isNotEmpty ? _episodes.first : null);
-                        if (target != null) startWatchTogether(context, jf, target);
-                      },
-                      builder: watchTogetherButton,
-                    ),
-                    const SizedBox(width: 16),
-                    Focusable(
                       focusNode: _markNode,
                       onFocus: (viaMouse) {
                         if (!viaMouse) _setHero(true);
@@ -1965,7 +1954,7 @@ class _ShowScreenState extends State<ShowScreen> {
 
   // ---------- Phone layout ----------
   //
-  // Upright: the show's artwork at the top, the next episode to watch with Play, Watch together
+  // Upright: the show's artwork at the top, the next episode to watch with Play
   // and Mark season watched, the season pills, then the episodes as a list. Sideways: the TV
   // page re-sized for a phone, artwork across the screen, the details on the left and the
   // episodes as a row along the bottom. Tap an episode to play it.
@@ -2200,15 +2189,6 @@ class _ShowScreenState extends State<ShowScreen> {
             onTap: () {
               if (target != null) _play(target);
             }),
-      const SizedBox(width: 10),
-      PhoneButton(
-        icon: Icons.people_alt_outlined,
-        semanticLabel: 'Watch together',
-        height: upright ? 50 : 44,
-        onTap: () {
-          if (target != null) startWatchTogether(context, jf, target);
-        },
-      ),
       const SizedBox(width: 10),
       PhoneButton(
         icon: Icons.check_rounded,

@@ -556,35 +556,6 @@ Future<void> _playForParty(BuildContext context, Jellyfin jf, dynamic item, {int
   }
 }
 
-/// Watch together from a title: plays it for your party, or opens a party with it.
-Future<void> startWatchTogether(BuildContext context, Jellyfin jf, dynamic item) async {
-  if (item == null) return;
-  final sync = SyncPlay.of(jf);
-  if (sync.inParty) return _playForParty(context, jf, item);
-  _toast(context, 'Opening a room…');
-  sync._opening = true;
-  try {
-    final title = item['Type'] == 'Episode'
-        ? '${item['SeriesName'] ?? ''} S${item['ParentIndexNumber'] ?? '?'} E${item['IndexNumber'] ?? '?'}'
-        : (item['Name'] ?? 'a movie').toString();
-    // Rollback's instant channel when this profile is allowed to use it; otherwise Jellyfin's.
-    final direct = await sync.canDirect();
-    await sync.create('${jf.userName ?? 'Rollback'} · $title${direct ? SyncPlay.directTag : ''}');
-    sync.direct = direct;
-    sync.isHost = true;
-    if (!direct) debugPrint("Together: using Jellyfin's Watch Together (this profile can't use Rollback's instant channel)");
-    final resume = (item['UserData']?['PlaybackPositionTicks'] ?? 0) as int;
-    await sync.play(item['Id'].toString(), resume);
-    if (!context.mounted) return;
-    await _openRoomPlayer(context, jf, sync);
-  } catch (e) {
-    await sync.leave();
-    if (context.mounted) _toast(context, _friendly(e), problem: true);
-  } finally {
-    sync._opening = false;
-  }
-}
-
 Future<void> joinWatchTogether(BuildContext context, Jellyfin jf, String groupId) async {
   final sync = SyncPlay.of(jf);
   _toast(context, 'Joining…');
@@ -1259,22 +1230,6 @@ class _StartParty extends StatelessWidget {
     );
   }
 }
-
-/// The "Watch together" button next to Play.
-Widget watchTogetherButton(bool focused) => AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      height: 64,
-      padding: const EdgeInsets.only(left: 24, right: 30),
-      decoration: BoxDecoration(
-        color: focused ? kFg : kPillFill,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.groups_rounded, size: 30, color: focused ? kBg : kFg),
-        const SizedBox(width: 12),
-        Text('Watch together', style: tvBody(24, weight: FontWeight.w600, color: focused ? kBg : kFg)),
-      ]),
-    );
 
 // ---------- Invite card ----------
 
