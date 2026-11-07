@@ -136,6 +136,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   // see-through over it, like with the video surface.
   bool _hdrLayer = !_phone && !surfaceWanted && hdrLayerWanted;
   HdrLayerInfo? _layer; // set once the layer is drawing
+  // The layer while it's being opened: leaving the player in that moment must wait for it and
+  // close it before the engine goes (the layer would otherwise attach to a destroyed engine).
+  Future<HdrLayerInfo?>? _layerOpening;
 
   // Whether this video is HDR (HDR10, HDR10+, HLG or Dolby Vision), from Jellyfin.
   bool get _videoIsHdr {
@@ -352,6 +355,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       if (server) {
         // The server already fixed the colours: no conversion on this device.
         await mpv.setProperty('vf', '');
+        _dvFilterHdr = null;
         await mpv.setProperty('hwdec', 'auto-safe');
       } else if (_isDolbyVisionOnly && (!_surface || _hdrLayer)) {
         // (Through the video surface, gpu-next applies Dolby Vision's colours itself; the HDR
@@ -480,8 +484,34 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Future<void> _applyDvFilter() async {
     final mpv = player.platform;
     if (mpv is! NativePlayer) return;
+    final hdr = _layer?.hdr == true;
     await mpv.setProperty('hwdec', 'auto-copy-safe');
-    await mpv.setProperty('vf', 'lavfi=[${_layer?.hdr == true ? _dvConvertHdr : _dvConvert}]');
+    await mpv.setProperty('vf', 'lavfi=[${hdr ? _dvConvertHdr : _dvConvert}]');
+    _dvFilterHdr = hdr;
+    if (_layer != null) _dvWatch ??= Timer.periodic(const Duration(seconds: 1), (_) => _followLayerForDv());
+  }
+
+  // The HDR layer follows the screen by itself (HDR switched on or off during the film), but
+  // Dolby Vision's conversion was chosen for HDR10 or a normal picture when the film opened:
+  // switch it too, or the picture is sent as the wrong kind (washed out or far too dark).
+  bool? _dvFilterHdr; // what the conversion outputs now (null: no conversion)
+  Timer? _dvWatch;
+  bool _dvSwitching = false;
+  Future<void> _followLayerForDv() async {
+    final layer = _layer, was = _dvFilterHdr;
+    if (layer == null || was == null || _server || _dvSwitching || !mounted) return;
+    final now = await FrameVideo.hdrState();
+    if (!mounted || now == null || !now.open || now.id != layer.id || now.hdr == was) return;
+    _dvSwitching = true;
+    try {
+      _layer = now;
+      _note('the screen switched to ${now.hdr ? 'HDR' : 'SDR'}: Dolby Vision converted for it');
+      await _applyDvFilter();
+    } catch (e) {
+      _note('could not switch the Dolby Vision conversion ($e)');
+    } finally {
+      _dvSwitching = false;
+    }
   }
 
   // Dolby Vision with no HDR10 or SDR picture inside (Profile 5). Jellyfin calls it "DOVI";
@@ -928,7 +958,12 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _subs.add(player.stream.log.listen((l) => debugPrint('Player mpv: [${l.level}] ${l.prefix}: ${l.text.trim()}')));
       final mpv = player.platform;
       // Opened as a normal picture; _openSource switches it to HDR10 for an HDR file.
-      final info = mpv is NativePlayer ? await FrameVideo.openHdr(await mpv.handle, hdr: false) : null;
+      final opening = mpv is NativePlayer
+          ? mpv.handle.then((handle) => FrameVideo.openHdr(handle, hdr: false))
+          : Future<HdrLayerInfo?>.value(null);
+      _layerOpening = opening;
+      final info = await opening;
+      if (!mounted) return; // left while it opened: dispose closes it
       if (info != null) {
         _layer = info;
         // media_kit starts mpv with no video track (vid=no) and only its VideoController turns
@@ -1241,6 +1276,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _syncTimer?.cancel();
     _openTimer?.cancel();
     _adaptTimer?.cancel();
+    _dvWatch?.cancel();
     _saveLearnedLevel();
     _room?.dispose();
     widget.sync?.playerClosed(); // still in the party, just not watching
@@ -1253,9 +1289,15 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     // Stop the engine before its surface goes, then make Rollback's window solid again.
     final hadSurface = _surface;
     final layer = _layer;
+    final opening = _layerOpening;
     if (layer != null) {
       // The HDR layer holds the engine's render context, which has to go before the engine.
       FrameVideo.closeHdr(layer.id).whenComplete(player.dispose);
+    } else if (opening != null) {
+      // Left while the layer was still opening: let it finish, close it, then the engine.
+      opening
+          .then((info) => info != null ? FrameVideo.closeHdr(info.id) : null, onError: (_) => null)
+          .whenComplete(player.dispose);
     } else {
       player.dispose().whenComplete(() {
         if (hadSurface) FrameVideo.close();
