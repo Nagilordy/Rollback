@@ -2,9 +2,9 @@
 
 ## Original file first
 
-Frame plays the **original file** straight from your server whenever your computer can: 4K, HDR and Dolby Vision, TrueHD / Atmos and DTS sound, and SRT, ASS and PGS subtitles.
+Rollback plays the **original file** straight from your server whenever your computer can: 4K, HDR and Dolby Vision, TrueHD / Atmos and DTS sound, and SRT, ASS and PGS subtitles.
 
-If a file is too heavy for your computer or your network, Frame switches to a version your **server converts** on the fly. You can choose yourself in the player under **Playback**:
+If a file is too heavy for your computer or your network, Rollback switches to a version your **server converts** on the fly. You can choose yourself in the player under **Playback**:
 
 | Mode | When to use |
 |---|---|
@@ -14,7 +14,7 @@ If a file is too heavy for your computer or your network, Frame switches to a ve
 
 ## Audio and subtitles
 
-Frame **remembers your choices per show**, like Infuse (language, forced, SDH). Change them during playback from **Audio** and **Subtitles**; subtitles also have size, position and background options.
+Rollback **remembers your choices per show**, like Infuse (language, forced, SDH). Change them during playback from **Audio** and **Subtitles**; subtitles also have size, position and background options.
 
 ## Info
 

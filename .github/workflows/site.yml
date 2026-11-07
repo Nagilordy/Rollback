@@ -1,5 +1,5 @@
 # Builds the website (site/) and publishes it on GitHub Pages:
-# https://nagilordy.github.io/Frame/
+# https://nagilordy.github.io/Rollback/
 # Runs when the site or the changelog changes on main, or by hand (Actions > Website > Run workflow).
 name: Website
 

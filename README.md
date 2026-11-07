@@ -2,21 +2,21 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/logo/icon.svg">
     <source media="(prefers-color-scheme: light)" srcset="docs/logo/reverse.svg">
-    <img src="docs/logo/icon.svg" alt="Frame logo" width="128">
+    <img src="docs/logo/icon.svg" alt="Rollback logo" width="128">
   </picture>
 </p>
 
-<h1 align="center">Frame</h1>
+<h1 align="center">Rollback</h1>
 
 <p align="center"><b>Your Jellyfin library, the way a console would show it.</b></p>
 
-Frame is a couch-first app for **Jellyfin**: full-screen artwork, big readable menus, made for a
+Rollback is a couch-first app for **Jellyfin**: full-screen artwork, big readable menus, made for a
 **controller** but just as good with a mouse and keyboard. It plays your original files straight
 from your server, in the best quality your screen can show, **4K, HDR and Dolby Vision included**.
 Watch together with friends in sync, pick up where you left off, and never fight a tiny menu from
 the couch again.
 
-![Frame's Home screen: full-screen artwork, the show's logo, Resume and Watch together, Continue watching below](docs/screenshots/home.jpg)
+![Rollback's Home screen: full-screen artwork, the show's logo, Resume and Watch together, Continue watching below](docs/screenshots/home.jpg)
 
 > **Status:** 0.3 is in testing on Linux and Windows. Try a build from [Releases](../../releases)
 > and tell us what breaks: [report a bug](../../issues/new?template=bug_report.yml) or
@@ -34,7 +34,7 @@ the couch again.
 | ![A show page: the selected episode's title, details and full summary above the season tabs and episode row](docs/screenshots/show-page.jpg) | ![A movie page: the film's logo, year, length, rating, quality, summary, cast and Play / Watch together / Mark watched](docs/screenshots/movie-page.jpg) |
 | **Show pages**: pick an episode and read its whole summary | **Movie pages**: everything about the film, one press from playing |
 
-## Why Frame
+## Why Rollback
 
 - **It feels like a console, not a website.** Full-screen artwork, a white ring on whatever's
   selected, menus that slide up from the bottom like on a PS5. Everything is readable from across
@@ -50,7 +50,7 @@ the couch again.
   back and it happens for everyone. The party stays together from one episode to the next.
 - **It remembers you.** Your audio and subtitle choices per show, where you stopped, which episode
   is next, synced with Jellyfin so every other app agrees.
-- **Your server, your library.** Frame is just a better way to watch what you already have:
+- **Your server, your library.** Rollback is just a better way to watch what you already have:
   nothing to migrate, works with your existing Jellyfin users, and you can keep using the official
   apps alongside.
 
@@ -69,7 +69,7 @@ the couch again.
     seasons.
 - **Remembers your audio and subtitles** per show, like Infuse (language, forced, SDH).
 - **Watch parties** with invites, a party menu showing who's in and what they're watching, and
-  Frame-to-Frame sync that keeps everyone together.
+  Rollback-to-Rollback sync that keeps everyone together.
 - **Several servers.** Your own and a friend's, each staying signed in.
 
 ## Download
@@ -81,15 +81,14 @@ Get the latest build from the [Releases](../../releases) page:
 | Windows 10/11 | `FrameSetup.exe` | Run it. Updates install over the old version, and your settings stay. |
 | Linux | `Frame-x86_64.AppImage` | Make it executable (right-click > Properties > allow running as a program), then open it. |
 
-On Linux, Frame downloads its own copy of mpv the first time it plays a video, for HDR and Dolby
-Vision. Nothing else to install.
+Nothing else to install.
 
 ## What you need
 
 - A **Jellyfin** server (10.9 or newer recommended) on your network or reachable over the internet.
 - For **Watch together**:
   - Every profile needs SyncPlay access: Jellyfin Dashboard > Users > *profile* > SyncPlay access.
-  - Frame's instant sync mode also needs "Allow remote control of other users" for each profile
+  - Rollback's instant sync mode also needs "Allow remote control of other users" for each profile
     that uses it.
 - For **Quick Connect**: turn it on once in Jellyfin (Dashboard > General > Quick Connect).
 
@@ -108,13 +107,13 @@ Vision. Nothing else to install.
 
 Keyboard: arrows, Enter, Escape, Space, Page Up / Page Down, F11.
 
-## Help test Frame
+## Help test Rollback
 
 Found a problem? Use the [bug report form](../../issues/new?template=bug_report.yml); it asks for
 everything needed to fix it. Ideas go in the [feature request form](../../issues/new?template=feature_request.yml),
 and a 👍 on ideas you like helps pick what comes next. (You'll need a free GitHub account.)
 
-If Frame crashed or a video wouldn't play, attaching the latest log file helps a lot:
+If Rollback crashed or a video wouldn't play, attaching the latest log file helps a lot:
 
 - Linux: `~/.local/share/frame/logs/`
 - Windows: `%APPDATA%\Frame\logs\`
@@ -124,22 +123,22 @@ If Frame crashed or a video wouldn't play, attaching the latest log file helps a
 - **Windows:** plays inside the app window, so there's no HDR passthrough yet.
 - **Fire Stick, iPhone and Apple TV** builds aren't available yet.
 - **Watch together with official Jellyfin apps:** works, but those apps can still cause their own
-  sync loops. Frame-to-Frame rooms are the smoothest.
+  sync loops. Rollback-to-Rollback rooms are the smoothest.
 
 ## Credits
 
 Built on [Jellyfin](https://jellyfin.org), [mpv](https://mpv.io),
 [media_kit](https://github.com/media-kit/media-kit) and [Flutter](https://flutter.dev).
 Fonts: Hanken Grotesk and Sora (SIL Open Font License).
-Developers: see [Building Frame](docs/BUILDING.md).
+Developers: see [Building Rollback](docs/BUILDING.md).
 
 ## License
 
 © 2026 Nagi Lordy. All rights reserved.
 
-The source is public so you can see how Frame works and report problems. Please don't
-redistribute Frame or modified versions of it. Bug reports and ideas are very welcome; code
+The source is public so you can see how Rollback works and report problems. Please don't
+redistribute Rollback or modified versions of it. Bug reports and ideas are very welcome; code
 contributions (pull requests) aren't being accepted for now.
 
-Frame uses open-source software (Jellyfin's API, mpv, Flutter, media_kit, Hanken Grotesk and Sora),
+Rollback uses open-source software (Jellyfin's API, mpv, Flutter, media_kit, Hanken Grotesk and Sora),
 each under its own license.

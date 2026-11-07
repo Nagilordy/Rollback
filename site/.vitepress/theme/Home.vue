@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { withBase } from 'vitepress'
 
-const releases = 'https://github.com/Nagilordy/Frame/releases'
+const releases = 'https://github.com/Nagilordy/Rollback/releases'
 // Until the first full (non-test) release is out, both buttons open the Releases page.
 // After that they can point straight at the files:
 //   releases/latest/download/FrameSetup.exe and releases/latest/download/Frame-x86_64.AppImage
@@ -14,7 +14,7 @@ const features = [
   { icon: '🍿', title: 'Watch together', text: 'Start a party, friends get an invite. Pause, skip or go back and it happens for everyone, episode after episode.' },
   { icon: '📺', title: 'Feels like a console', text: 'Full-screen artwork, big readable menus and panels that slide up from the bottom. Made to be read from the couch.' },
   { icon: '🔖', title: 'Remembers you', text: 'Audio and subtitles per show, where you stopped, your next episode, all synced with Jellyfin.' },
-  { icon: '🏠', title: 'Your library, your server', text: 'Nothing to migrate: Frame works with your existing Jellyfin server and users, alongside the official apps.' },
+  { icon: '🏠', title: 'Your library, your server', text: 'Nothing to migrate: Rollback works with your existing Jellyfin server and users, alongside the official apps.' },
 ]
 </script>
 
@@ -24,7 +24,7 @@ const features = [
     <section class="hero">
       <img class="mark" :src="withBase('/mark.svg')" alt="" width="88" height="88">
       <h1>Your Jellyfin library,<br>the way a console would show it.</h1>
-      <p class="lead">Frame is a couch-first app for Jellyfin on Linux and Windows. Made for a controller, great with a mouse.</p>
+      <p class="lead">Rollback is a couch-first app for Jellyfin on Linux and Windows. Made for a controller, great with a mouse.</p>
       <div class="actions">
         <a class="btn primary" :href="windows">Download for Windows</a>
         <a class="btn" :href="linux">Download for Linux</a>
@@ -34,7 +34,7 @@ const features = [
     </section>
 
     <section class="shot">
-      <img :src="withBase('/shots/home.jpg')" alt="Frame's Home screen: full-screen artwork, the show's logo, Resume and Watch together, Continue watching below">
+      <img :src="withBase('/shots/home.jpg')" alt="Rollback's Home screen: full-screen artwork, the show's logo, Resume and Watch together, Continue watching below">
     </section>
 
     <section class="features">
@@ -78,7 +78,7 @@ const features = [
         <a class="btn primary" :href="windows">Download for Windows</a>
         <a class="btn" :href="linux">Download for Linux</a>
       </div>
-      <p class="note">Found a problem? <a href="https://github.com/Nagilordy/Frame/issues/new?template=bug_report.yml">Report a bug</a> · Have an idea? <a href="https://github.com/Nagilordy/Frame/issues/new?template=feature_request.yml">Suggest it</a></p>
+      <p class="note">Found a problem? <a href="https://github.com/Nagilordy/Rollback/issues/new?template=bug_report.yml">Report a bug</a> · Have an idea? <a href="https://github.com/Nagilordy/Rollback/issues/new?template=feature_request.yml">Suggest it</a></p>
     </section>
   </div>
 </template>

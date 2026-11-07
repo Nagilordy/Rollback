@@ -1,6 +1,6 @@
 # Controller and keyboard
 
-Frame works with **PlayStation**, **Xbox** and **Steam** controllers out of the box, and shows a button guide that matches the one in your hands. Mouse and keyboard work everywhere too.
+Rollback works with **PlayStation**, **Xbox** and **Steam** controllers out of the box, and shows a button guide that matches the one in your hands. Mouse and keyboard work everywhere too.
 
 ## Controller
 
