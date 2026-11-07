@@ -507,6 +507,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _layer = now;
       _note('the screen switched to ${now.hdr ? 'HDR' : 'SDR'}: Dolby Vision converted for it');
       await _applyDvFilter();
+      // Swapping the conversion drops a few frames once; that isn't this device struggling
+      // (counted as such, it switched to the server's version, whose DV5 colours are wrong).
+      _lastDrops = -1;
+      _lastSeek = DateTime.now();
     } catch (e) {
       _note('could not switch the Dolby Vision conversion ($e)');
     } finally {
@@ -941,12 +945,20 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         if (mounted && (player.state.width ?? 0) == 0) setState(() => _showPhoneLog = true);
       });
     }
-    // Still nothing after 25 seconds: say so instead of spinning forever.
+    // Still nothing after 25 seconds: say so instead of spinning forever. Only for opening:
+    // once a video has loaded, a later switch (the server's version starting up) doesn't
+    // count, and if the video arrives after all, the message goes away by itself.
     _openTimer = Timer(const Duration(seconds: 25), () {
-      if (player.state.duration == Duration.zero) {
-        _fail("The server isn't sending the video. Check that the NAS is on.");
-      }
+      if (player.state.duration == Duration.zero) _fail(_notSending);
     });
+    _subs.add(player.stream.duration.listen((d) {
+      if (d <= Duration.zero) return;
+      _openTimer?.cancel();
+      if (_failure == _notSending && mounted) {
+        _note('the video arrived after all');
+        setState(() => _failure = null);
+      }
+    }));
     unawaited(_startWhenVideoReady());
   }
 
@@ -1106,6 +1118,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
   String? _failure;
   Timer? _openTimer;
+  static const _notSending = "The server isn't sending the video. Check that the NAS is on.";
 
   void _fail(String message) {
     if (!mounted || _failure != null || _switching) return;
