@@ -385,7 +385,12 @@ class SyncPlay {
   }
 
   Future<void> leave() async {
-    if (group.value == null) return;
+    if (group.value == null) {
+      // Not in a room as far as this app knows, but the server may have made one it never
+      // confirmed (starting or joining failed half way): leave that too, quietly.
+      if (_ws != null) await jf.postPath('/SyncPlay/Leave').then((_) {}, onError: (_) {});
+      return;
+    }
     if (direct) await sendDirect({'t': 'bye', 'by': jf.userName ?? 'Someone'});
     group.value = null;
     queue = null;
