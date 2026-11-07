@@ -1,0 +1,26 @@
+Rollback
+Copyright (c) 2026 Nagilordy. All rights reserved.
+
+This software and its source code are the property of the copyright holder.
+
+You may download and use official builds of Rollback for your own personal use.
+
+Unless the copyright holder has given you written permission, you may not:
+  - copy, modify, adapt, translate or create derivative works of this software or its
+    source code;
+  - distribute, sell, sublicense, rent or otherwise make this software or its source code
+    available to others, in original or modified form;
+  - remove or change any copyright notice in it.
+
+Being able to see the source code does not grant any of these rights.
+
+Third-party components that ship with Rollback stay under their own licences, listed in
+THIRD_PARTY_NOTICES.md. Nothing in this licence limits the rights those licences give you.
+In particular, you may replace, modify and reverse-engineer the LGPL libraries in Rollback
+(libmpv and the FFmpeg libraries), and reverse-engineer Rollback as far as needed to debug
+such modifications, as the GNU Lesser General Public License allows.
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.

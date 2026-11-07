@@ -23,9 +23,34 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
-            libstdc++-12-dev libmpv-dev mpv file desktop-file-utils \
+            libstdc++-12-dev file desktop-file-utils \
             libcurl4-openssl-dev libx11-dev dpkg-dev \
-            wayland-protocols libwayland-bin libwayland-dev libegl-dev
+            wayland-protocols libwayland-bin libwayland-dev libegl-dev \
+            build-essential nasm meson libass-dev libplacebo-dev libdav1d-dev libva-dev \
+            libdrm-dev libvulkan-dev libvdpau-dev libgnutls28-dev libpipewire-0.3-dev \
+            libpulse-dev libxkbcommon-dev libgl-dev libopus-dev libvpx-dev libxml2-dev \
+            zlib1g-dev libuchardet-dev liblcms2-dev libjpeg-dev libzimg-dev libbluray-dev \
+            libarchive-dev
+
+      # Rollback ships its own LGPL-only libmpv and FFmpeg (Ubuntu's are GPL). Built once and
+      # kept until the build script changes.
+      - name: LGPL video libraries (cache)
+        id: lgpl
+        uses: actions/cache@v4
+        with:
+          path: |
+            lgpl/prefix
+            lgpl/src/*.tar.*
+          key: lgpl-libmpv-${{ runner.os }}-${{ hashFiles('packaging/linux/build-lgpl-libmpv.sh') }}
+
+      - name: LGPL video libraries (build)
+        if: steps.lgpl.outputs.cache-hit != 'true'
+        run: packaging/linux/build-lgpl-libmpv.sh lgpl
+
+      - name: Use the LGPL libmpv for the build
+        run: |
+          echo "PKG_CONFIG_PATH=$PWD/lgpl/prefix/lib/pkgconfig" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$PWD/lgpl/prefix/lib" >> $GITHUB_ENV
 
       - uses: subosito/flutter-action@v2
         with:
@@ -110,39 +135,7 @@ jobs:
         run: flutter build linux --release --dart-define=FRAME_BUILD=${GITHUB_SHA::7} --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN }}
 
       - name: Pack the AppImage
-        run: |
-          set -e
-          APPDIR=AppDir
-          mkdir -p $APPDIR/usr/bin $APPDIR/usr/share/applications $APPDIR/usr/share/icons/hicolor/512x512/apps
-          # The app keeps its own layout next to the program (lib/ and data/ beside it).
-          cp -r build/linux/x64/release/bundle/* $APPDIR/usr/bin/
-          cp packaging/rollback.desktop $APPDIR/usr/share/applications/rollback.desktop
-          cp packaging/rollback.png $APPDIR/usr/share/icons/hicolor/512x512/apps/rollback.png
-
-          # Packing tools at fixed versions, checked against their known checksums: every release
-          # is packed the same way, and a changed or tampered download stops the build.
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage
-          wget -q https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/7a3fbc31a9e5075073ff8790f26effbac5f84453/linuxdeploy-plugin-gtk.sh
-          echo "c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d  linuxdeploy-x86_64.AppImage" | sha256sum -c -
-          echo "b0f4cbc684a0103a9651f0955b635eaea0096b3a66c0f5a2c2aa337960375171  linuxdeploy-plugin-gtk.sh" | sha256sum -c -
-          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk.sh packaging/AppRun
-
-          # Every library Rollback and its video player need, so nothing has to be installed.
-          LIBS=""
-          for l in $APPDIR/usr/bin/lib/*.so; do LIBS="$LIBS --library $l"; done
-          MPVLIB=$(ls /usr/lib/x86_64-linux-gnu/libmpv.so.2* | head -1)
-
-          export DEPLOY_GTK_VERSION=3
-          export APPIMAGE_EXTRACT_AND_RUN=1
-          OUTPUT=Rollback-x86_64.AppImage ./linuxdeploy-x86_64.AppImage \
-            --appdir $APPDIR \
-            --executable $APPDIR/usr/bin/player_test \
-            $LIBS --library $MPVLIB \
-            --desktop-file $APPDIR/usr/share/applications/rollback.desktop \
-            --icon-file packaging/rollback.png \
-            --custom-apprun packaging/AppRun \
-            --plugin gtk \
-            --output appimage
+        run: packaging/linux/pack-appimage.sh lgpl/prefix out && mv out/Rollback-x86_64.AppImage .
 
       - uses: actions/upload-artifact@v4
         with:
@@ -153,4 +146,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: Rollback-x86_64.AppImage
+          # The LGPL libraries' exact source goes with every release (see THIRD_PARTY_NOTICES.md).
+          files: |
+            Rollback-x86_64.AppImage
+            lgpl/src/ffmpeg-7.1.1.tar.xz
+            lgpl/src/mpv-0.39.0.tar.gz
