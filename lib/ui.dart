@@ -20,14 +20,7 @@ final ValueNotifier<bool> fullScreen = ValueNotifier(false);
 // Full screen is a choice, never automatic (this is a PC app): F11 anywhere, the controller's
 // touchpad / Create button (shown in the controller legend), the button in the player, or
 // double-clicking the video.
-Future<void> toggleFullScreen() {
-  final override = fullScreenOverride;
-  if (override != null) return override();
-  return setFullScreen(!fullScreen.value);
-}
-
-// While a video plays in the mpv window, full screen applies to that window instead.
-Future<void> Function()? fullScreenOverride;
+Future<void> toggleFullScreen() => setFullScreen(!fullScreen.value);
 
 Future<void> setFullScreen(bool on) async {
   if (!isDesktop) return;
@@ -147,7 +140,7 @@ class FadingShade extends StatelessWidget {
 
 // ---------- Surfaces: everything that pops up ----------
 //
-// Frame's design has two layers (the way TV interfaces from Google, Sony and Netflix work):
+// Rollback's design has two layers (the way TV interfaces from Google, Sony and Netflix work):
 //  - over the artwork (Home, show pages, the player): translucent pill buttons; selected =
 //    solid white.
 //  - anything that pops up (menus, panels, the keyboard, notifications): one solid dark
@@ -157,7 +150,7 @@ class FadingShade extends StatelessWidget {
 
 const kSurface = Color(0xFF1A1E25);
 
-/// The profile colour of whoever is using Frame (set when a profile opens Home).
+/// The profile colour of whoever is using Rollback (set when a profile opens Home).
 Color kAccent = const Color(0xFF6F8CFF);
 
 class Surface extends StatelessWidget {

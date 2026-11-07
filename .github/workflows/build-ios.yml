@@ -1,6 +1,6 @@
 name: Build iPhone IPA
 
-# Only when started by hand (Actions tab > Build iPhone IPA > Run workflow): Frame has no
+# Only when started by hand (Actions tab > Build iPhone IPA > Run workflow): Rollback has no
 # iPhone setup yet, so running it on every upload would just fail each time.
 on:
   workflow_dispatch:
@@ -32,14 +32,14 @@ jobs:
       - name: Create the iPhone project files
         run: flutter create --platforms=ios --org com.kevin .
 
-      # On the home screen: "Frame" under Frame's icon, instead of Flutter's template name and icon.
+      # On the home screen: "Rollback" under Rollback's icon, instead of Flutter's template name and icon.
       # Every icon size Xcode asks for is made from packaging/ios/AppIcon-1024.png (no
       # transparency, square: iOS rounds the corners itself).
-      - name: Frame's name and icon on the home screen
+      - name: Rollback's name and icon on the home screen
         run: |
           PLIST=ios/Runner/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Frame" "$PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Frame" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleName Frame" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Rollback" "$PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Rollback" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName Rollback" "$PLIST" || true
           ICONS=ios/Runner/Assets.xcassets/AppIcon.appiconset
           for f in "$ICONS"/*.png; do
             px=$(sips -g pixelWidth "$f" | awk '/pixelWidth/ {print $2}')

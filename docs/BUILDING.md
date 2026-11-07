@@ -1,6 +1,6 @@
-# Building Frame
+# Building Rollback
 
-Frame is a [Flutter](https://flutter.dev) app written in Dart. The controls inside the mpv player
+Rollback is a [Flutter](https://flutter.dev) app written in Dart. The controls inside the mpv player
 are a Lua script (`assets/mpv/frame_ui.lua`).
 
 ```bash
@@ -17,4 +17,4 @@ in `.github/workflows` build the Windows installer and the Linux AppImage. Pushi
 - `perf-<date>.log`: smoothness, memory and playback stats
 - `together-<date>.log`: watch party (SyncPlay) messages
 
-Linux: `~/.local/share/frame/logs/` · Windows: `%APPDATA%\Frame\logs\`
+Linux: `~/.local/share/frame/logs/` · Windows: `%APPDATA%\Rollback\logs\`

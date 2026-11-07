@@ -4,7 +4,7 @@ import { withBase } from 'vitepress'
 const releases = 'https://github.com/Nagilordy/Rollback/releases'
 // Until the first full (non-test) release is out, both buttons open the Releases page.
 // After that they can point straight at the files:
-//   releases/latest/download/FrameSetup.exe and releases/latest/download/Frame-x86_64.AppImage
+//   releases/latest/download/RollbackSetup.exe and releases/latest/download/Rollback-x86_64.AppImage
 const windows = releases
 const linux = releases
 

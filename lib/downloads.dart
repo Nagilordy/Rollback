@@ -1,6 +1,6 @@
 // Downloads: the original file from the NAS, kept on this device to watch without the server.
 //
-// Uses background_downloader, so a download keeps going with Frame closed (iOS background
+// Uses background_downloader, so a download keeps going with Rollback closed (iOS background
 // transfers), pauses and resumes, and retries after a dropped connection. Each download keeps
 // the episode's or movie's details and artwork beside the file, so it shows and plays with
 // no server at all. Where you stop in a download is saved here and sent to Jellyfin the next
@@ -100,7 +100,7 @@ class Downloads extends ChangeNotifier {
   String pathOf(Download d) => '${dir.path}/${d.file}';
 
   /// Call once at startup: loads the list and picks up downloads that finished or moved on
-  /// while Frame was closed.
+  /// while Rollback was closed.
   Future<void> start() => _starting ??= _start();
 
   Future<void> _start() async {

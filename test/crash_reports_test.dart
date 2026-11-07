@@ -13,8 +13,8 @@ void main() {
   });
   test('tokens are removed from the sign-in header', () {
     expect(
-      scrubSecrets('MediaBrowser Client="Frame", Token="abc123"'),
-      'MediaBrowser Client="Frame", Token="…"',
+      scrubSecrets('MediaBrowser Client="Rollback", Token="abc123"'),
+      'MediaBrowser Client="Rollback", Token="…"',
     );
   });
   test('ordinary text is left alone', () {

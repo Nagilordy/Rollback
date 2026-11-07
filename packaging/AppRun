@@ -1,5 +1,11 @@
 #!/bin/sh
-# Starts Frame from inside the AppImage, with its bundled libraries first in line.
+# Starts Rollback from inside the AppImage, with its bundled libraries first in line.
 HERE="$(dirname "$(readlink -f "$0")")"
 export LD_LIBRARY_PATH="$HERE/usr/lib:${LD_LIBRARY_PATH}"
+# The AppImage's GTK setup (linuxdeploy-plugin-gtk) forces X11 before this runs. Rollback needs
+# Wayland on a Wayland desktop: real HDR (the player's HDR layer) only exists there.
+# FRAME_X11=1 keeps X11 (as a fallback if something goes wrong under Wayland).
+if [ -n "$WAYLAND_DISPLAY" ] && [ "$FRAME_X11" != "1" ]; then
+  export GDK_BACKEND=wayland
+fi
 exec "$HERE/usr/bin/player_test" "$@"

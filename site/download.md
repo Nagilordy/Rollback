@@ -4,8 +4,8 @@ Rollback is free. Get the latest version from the [Releases page on GitHub](http
 
 | System | File | How to install |
 |---|---|---|
-| **Windows 10 / 11** | `FrameSetup.exe` | Run it. Updates install over the old version, and your settings stay. |
-| **Linux** | `Frame-x86_64.AppImage` | Make it executable (right-click → Properties → allow running as a program), then open it. |
+| **Windows 10 / 11** | `RollbackSetup.exe` | Run it. Updates install over the old version, and your settings stay. |
+| **Linux** | `Rollback-x86_64.AppImage` | Make it executable (right-click → Properties → allow running as a program), then open it. |
 
 Nothing else to install.
 

@@ -1,12 +1,12 @@
-// Frame's own log files, and a quiet performance recorder.
+// Rollback's own log files, and a quiet performance recorder.
 //
-// Logs go to ~/.local/share/frame/logs/ on Linux and %APPDATA%\Frame\logs\ on Windows, one
+// Logs go to ~/.local/share/frame/logs/ on Linux and %APPDATA%\Rollback\logs\ on Windows, one
 // file per kind per day (together-2026-10-29.log, perf-2026-10-29.log). Each line starts with
-// the seconds since Frame started, then the time of day.
+// the seconds since Rollback started, then the time of day.
 //
 // The performance recorder writes, every 10 seconds that something was drawn: how many frames,
 // how long the slowest took, how many missed the screen's refresh (a visible stutter), what
-// was selected at the time, and how much memory Frame uses. Startup time is logged once, and
+// was selected at the time, and how much memory Rollback uses. Startup time is logged once, and
 // the players add their own playback lines (dropped frames, decoder, buffer).
 
 import 'dart:io';
@@ -27,7 +27,7 @@ class AppLog {
   static String get folder {
     final env = Platform.environment;
     return Platform.isWindows
-        ? '${env['APPDATA'] ?? '.'}\\Frame\\logs'
+        ? '${env['APPDATA'] ?? '.'}\\Rollback\\logs'
         : '${env['XDG_DATA_HOME'] ?? '${env['HOME'] ?? '.'}/.local/share'}/frame/logs';
   }
 
@@ -57,7 +57,7 @@ class PerfRecorder {
   static int _worstUs = 0;
 
   static void start() {
-    perfLog('Frame ${Platform.operatingSystem} started (log for this run begins here)');
+    perfLog('Rollback ${Platform.operatingSystem} started (log for this run begins here)');
     SchedulerBinding.instance.addTimingsCallback(_onTimings);
     WidgetsBinding.instance.waitUntilFirstFrameRasterized.then((_) {
       perfLog('first screen drawn ${AppLog.since.elapsedMilliseconds} ms after start');
@@ -75,7 +75,7 @@ class PerfRecorder {
     }
   }
 
-  /// True while Frame's window is hidden behind the mpv player: its frames then just wait
+  /// True while Rollback's window is hidden behind the mpv player: its frames then just wait
   /// for a window nobody sees, and would show up as huge false "slow frames".
   static bool hidden = false;
 

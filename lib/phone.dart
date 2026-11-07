@@ -1,4 +1,4 @@
-// Touch layout pieces for phones: the same Frame look (colors, fonts, pills) in real phone
+// Touch layout pieces for phones: the same Rollback look (colors, fonts, pills) in real phone
 // sizes, for the screens that have a phone layout (see isPhone in ui.dart). Everything here is
 // sized in the phone's own points, not the 1920x1080 TV canvas.
 

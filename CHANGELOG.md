@@ -24,8 +24,11 @@ good with a mouse and keyboard. Testing starts on **Linux**; Windows and SteamOS
 ### Playback
 - **The original file, straight from your server,** whenever your computer can play it: 4K,
   TrueHD and DTS sound, and SRT, ASS and PGS subtitles. When a file is too heavy, Rollback
-  switches to the version your server converts, at the same moment. HDR films are shown as a
-  normal picture for now; real HDR comes later.
+  switches to the version your server converts, at the same moment.
+- **Real HDR on Linux.** On a desktop with HDR switched on (KDE Plasma 6, for example), HDR10
+  and Dolby Vision films play in real HDR, up to your screen's peak brightness, with the
+  controls on top. Switching HDR on or off during a film is followed within a second, and Info
+  shows it under Your screen ("HDR · 800 nits"). Elsewhere HDR films get a normal picture.
 - **Resume** where you stopped, on any device, and episodes are marked watched at the end.
 - **Your audio and subtitle choices are remembered** for each show.
 

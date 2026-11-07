@@ -19,7 +19,7 @@ Check the server settings on the [Watch parties](/guide/watch-party#what-the-ser
 If Rollback crashed or something misbehaves, the latest log file helps a lot:
 
 - **Linux:** `~/.local/share/frame/logs/`
-- **Windows:** `%APPDATA%\Frame\logs\`
+- **Windows:** `%APPDATA%\Rollback\logs\`
 
 ## Report a problem
 

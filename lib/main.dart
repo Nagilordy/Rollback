@@ -1,4 +1,4 @@
-// Frame: the app's start (window, controller, login) and the connection to Jellyfin.
+// Rollback: the app's start (window, controller, login) and the connection to Jellyfin.
 
 import 'dart:async';
 import 'dart:convert';
@@ -17,7 +17,6 @@ import 'crash_reports.dart' show startWithCrashReports;
 import 'video_surface.dart' show surfacePlayerSkipped;
 import 'gamepad.dart';
 import 'images.dart' show tidyArtworkCache;
-import 'native_player.dart' show findMpv;
 import 'perf.dart';
 import 'profiles.dart' show StartScreen;
 import 'syncplay.dart' show SyncPlay;
@@ -29,14 +28,11 @@ Future<void> main() async {
   MediaKit.ensureInitialized();
   if (isDesktop) {
     await windowManager.ensureInitialized();
-    await windowManager.setTitle('Frame');
+    await windowManager.setTitle('Rollback');
     // SteamOS Gaming Mode: one app at a time, full screen (see gaming_mode.dart).
     if (inGamingMode) await setFullScreen(true);
   }
   await Jellyfin.loadDeviceIdentity();
-  // Looking for mpv runs alongside startup instead of before it (see findMpv).
-  final mpvSearch = Stopwatch()..start();
-  findMpv().then((_) => perfLog('looking for mpv took ${mpvSearch.elapsedMilliseconds} ms (in the background)'));
   tidyArtworkCache();
   // Keep more artwork in memory so going back to a card shows it instantly.
   PaintingBinding.instance.imageCache.maximumSizeBytes = 256 * 1024 * 1024;
@@ -63,7 +59,7 @@ class _TestAppState extends State<TestApp> {
     surfacePlayerSkipped.value = null;
     showBanner(ctx,
         picture: bannerIcon(Icons.hdr_off_rounded),
-        who: "Frame's player not used",
+        who: "Rollback's player not used",
         text: why,
         line: const Color(0xFFF2B05A),
         duration: const Duration(seconds: 7));
@@ -86,7 +82,7 @@ class _TestAppState extends State<TestApp> {
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_onKey);
-    // Frame's player couldn't be used on this system: say why, once.
+    // Rollback's player couldn't be used on this system: say why, once.
     surfacePlayerSkipped.addListener(_previewSkipped);
     GamepadInput.start();
     SyncPlay.navigator = _navigator; // a video someone starts in your party can open from anywhere
@@ -105,7 +101,7 @@ class _TestAppState extends State<TestApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Frame',
+      title: 'Rollback',
       theme: ThemeData.dark(useMaterial3: true).copyWith(
           textTheme: ThemeData.dark(useMaterial3: true).textTheme.apply(fontFamily: 'Hanken Grotesk'),
           // Hover labels (mouse only) in the app's own style, not Flutter's default grey box.
@@ -197,7 +193,7 @@ class Jellyfin {
   // Each install has its own ID, so Jellyfin sees the PC and the iPhone as two devices
   // (with one shared ID, signing in on one signs the other out). Named after the computer.
   static String _deviceId = 'frame';
-  static String _deviceName = 'Frame';
+  static String _deviceName = 'Rollback';
   static String get deviceId => _deviceId;
 
   static Future<void> loadDeviceIdentity() async {
@@ -210,12 +206,12 @@ class Jellyfin {
         await prefs.setString('deviceId', id);
       }
       _deviceId = id;
-      _deviceName = Platform.localHostname.isEmpty ? 'Frame' : Platform.localHostname;
+      _deviceName = Platform.localHostname.isEmpty ? 'Rollback' : Platform.localHostname;
     } catch (_) {}
   }
 
   static String get _client =>
-      'MediaBrowser Client="Frame", Device="$_deviceName", DeviceId="$_deviceId", Version="0.3"';
+      'MediaBrowser Client="Rollback", Device="$_deviceName", DeviceId="$_deviceId", Version="0.3"';
 
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
@@ -332,8 +328,8 @@ class Jellyfin {
     return data.cast<String, dynamic>();
   }
 
-  // Quick Connect: Frame shows a short code, you approve it from Jellyfin on your phone,
-  // and Frame is signed in without typing a password on the TV.
+  // Quick Connect: Rollback shows a short code, you approve it from Jellyfin on your phone,
+  // and Rollback is signed in without typing a password on the TV.
   Future<bool> quickConnectEnabled() async {
     try {
       final res = await _send(_http.get(Uri.parse('$server/QuickConnect/Enabled'), headers: _headers));
@@ -747,7 +743,7 @@ class Jellyfin {
       serverStream(String itemId, {int? audioIndex, int? subtitleIndex, bool phone = false}) async {
     const maxBitrate = 120000000;
     final profile = {
-      'Name': 'Frame',
+      'Name': 'Rollback',
       'MaxStreamingBitrate': maxBitrate,
       'MaxStaticBitrate': maxBitrate,
       'DirectPlayProfiles': [],

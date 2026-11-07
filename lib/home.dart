@@ -76,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadSaved();
     _load();
-    // Downloads: pick up ones that finished while Frame was closed.
+    // Downloads: pick up ones that finished while Rollback was closed.
     Downloads.instance.start();
     ProfileStore.serverName().then((n) {
       if (mounted) setState(() => _serverName = n);
@@ -808,7 +808,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _phoneBack();
   }
 
-  // "Frame" and your avatar, with the library tabs under them (upright) or beside them (sideways).
+  // "Rollback" and your avatar, with the library tabs under them (upright) or beside them (sideways).
   Widget _phoneTopBar(BuildContext context, bool upright, EdgeInsets m) {
     final downloads = PhoneButton(
       icon: Icons.download_rounded,
@@ -837,7 +837,7 @@ class _HomeScreenState extends State<HomeScreen> {
       Padding(
         padding: EdgeInsets.only(left: m.left, right: m.right),
         child: Row(children: [
-          Text('Frame', style: phoneTitle(22)),
+          Text('Rollback', style: phoneTitle(22)),
           const Spacer(),
           downloads,
           const SizedBox(width: 10),

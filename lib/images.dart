@@ -198,7 +198,7 @@ Widget netImage(
 // ---------- Title logos ----------
 //
 // Some logos on Jellyfin are pictures with a solid black background instead of a see-through
-// one, which shows as a black box over the artwork. Frame checks the edges of each logo once:
+// one, which shows as a black box over the artwork. Rollback checks the edges of each logo once:
 // if they're solid black, it turns black into see-through (bright parts stay, dark parts fade
 // away), so the logo sits on the artwork like a proper one.
 
