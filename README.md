@@ -14,16 +14,17 @@
 
 Rollback is a couch-first app for **Jellyfin**: full-screen artwork, big readable menus, made for a
 **controller** but just as good with a mouse and keyboard. It plays your original files straight
-from your server, in the best quality your screen can show, **4K, HDR and Dolby Vision included**.
+from your server, in the best quality your screen can show, **4K included**, and real HDR on Linux.
 Watch together with friends in sync, pick up where you left off, and never fight a tiny menu from
 the couch again.
 
 ![Rollback's Home screen: full-screen artwork, the show's logo, Resume and Watch together, Continue watching below](docs/screenshots/home.jpg)
 
-> **Status:** 0.3 is in testing on Linux and Windows. Try a build from [Releases](../../releases)
-> and tell us what breaks: [report a bug](../../issues/new?template=bug_report.yml) or
-> [suggest an idea](../../issues/new?template=feature_request.yml). Progress toward 0.3:
-> [milestone](../../milestone/1).
+> **Status:** Rollback has started over at **0.1** with its new name (it was called Frame).
+> 0.1 is in testing on **Linux** first; Windows and SteamOS follow. There's no release to
+> download yet: the first 0.1 build will appear on the [Releases](../../releases) page. Found
+> something? [Report a bug](../../issues/new?template=bug_report.yml) or
+> [suggest an idea](../../issues/new?template=feature_request.yml).
 
 ## A quick look
 
@@ -31,7 +32,7 @@ the couch again.
 |---|---|
 | ![A library grid of anime posters, one selected with a white ring](docs/screenshots/library.jpg) | ![Sort & filter: a sheet from the bottom with Sort by, Show and Genre](docs/screenshots/sort-filter.jpg) |
 | **Libraries** with big posters, made to browse with a controller | **Sort & filter** in one sheet: sort, unwatched only, 4K only, genres |
-| ![The player: a see-through bar with Audio, Subtitles, Playback and Info, and -10 / play / +30](docs/screenshots/player.jpg) | ![Watch together: a card explaining watch parties, with Start the party](docs/screenshots/watch-party.jpg) |
+| ![The player: a bar with Audio, Subtitles, Playback and Info, and -10 / play / +30](docs/screenshots/player.jpg) | ![Watch together: a card explaining watch parties, with Start the party](docs/screenshots/watch-party.jpg) |
 | **The player** shows what's playing at a glance: audio, subtitles, quality | **Watch parties**: anything you play opens for everyone, in sync |
 | ![A show page: the selected episode's title, details and full summary above the season tabs and episode row](docs/screenshots/show-page.jpg) | ![A movie page: the film's logo, year, length, rating, quality, summary, cast and Play / Watch together / Mark watched](docs/screenshots/movie-page.jpg) |
 | **Show pages**: pick an episode and read its whole summary | **Movie pages**: everything about the film, one press from playing |
@@ -43,9 +44,10 @@ the couch again.
   the room.
 - **Made for controllers.** PlayStation, Xbox and Steam controllers work out of the box, with a
   button guide that matches the one in your hands. Mouse and keyboard work everywhere too.
-- **Best-quality playback.** Plays the original file directly (4K, HDR, Dolby Vision, TrueHD /
-  Atmos, DTS; SRT, ASS and PGS subtitles) and quietly switches to your server's converted version only
-  when a device can't keep up.
+- **Best-quality playback.** Plays the original file directly (4K, TrueHD / Atmos, DTS; SRT, ASS
+  and PGS subtitles) and quietly switches to your server's converted version only when a device
+  can't keep up. On Linux with HDR switched on (KDE Plasma 6, for example), HDR10 and Dolby
+  Vision films play in real HDR; elsewhere they get a normal picture for now.
 - **Seamless from Play to picture.** The loading screen looks like starting a game: artwork, logo,
   where you'll resume. Then it opens straight onto the video.
 - **Watch together.** Start a party and friends get an invite on their Home. Pause, skip or go
@@ -64,9 +66,11 @@ the couch again.
   phone, nothing to type) or a password with an on-screen keyboard.
 - **Show pages.** Seasons and episodes; the selected episode's full summary shows above the row.
 - **The player.**
-  - A see-through bar with Audio, Subtitles, Playback and Info, each showing what's in use.
-  - Big track cards, subtitle size / position / background, and an Info tab with the episode
-    and every technical detail (codec, HDR, decoder, buffering, dropped frames).
+  - A dark bar with the timeline, Audio, Subtitles, Playback and Info (each showing what's in
+    use) and -10 / play / +30.
+  - Big track cards (scroll them with the mouse wheel too), subtitle size / position /
+    background, speed, and an Info tab with the episode and how it's playing (video, sound,
+    decoder, buffering, dropped frames, your screen and its HDR).
   - **Up next** card at the credits: the next episode starts after a short countdown, across
     seasons.
 - **Remembers your audio and subtitles** per show, like Infuse (language, forced, SDH).
@@ -76,14 +80,10 @@ the couch again.
 
 ## Download
 
-Get the latest build from the [Releases](../../releases) page:
-
-| System | File | How to install |
-|---|---|---|
-| Windows 10/11 | `RollbackSetup.exe` | Run it. Updates install over the old version, and your settings stay. |
-| Linux | `Rollback-x86_64.AppImage` | Make it executable (right-click > Properties > allow running as a program), then open it. |
-
-Nothing else to install.
+No release yet: the first **0.1** build for **Linux** will appear on the [Releases](../../releases)
+page as `Rollback-x86_64.AppImage`. Make it executable (right-click > Properties > allow running
+as a program), then open it. Nothing else to install. Windows (`RollbackSetup.exe`) and SteamOS
+come after Linux.
 
 ## What you need
 
@@ -122,8 +122,12 @@ If Rollback crashed or a video wouldn't play, attaching the latest log file help
 
 ## Known limitations
 
-- **Windows:** plays inside the app window, so there's no HDR passthrough yet.
-- **Fire Stick, iPhone and Apple TV** builds aren't available yet.
+- **Linux first:** 0.1 is tested on Linux; Windows and SteamOS (Steam Machine, Steam Deck) come
+  next.
+- **HDR:** real HDR needs Linux with HDR switched on in the desktop (KDE Plasma 6, for example).
+  Windows and other desktops show HDR films as a normal picture for now.
+- **Search:** there's no search bar yet ([#25](../../issues/25)).
+- **Phones and TV boxes:** iPhone, Fire Stick and Apple TV versions are on hold.
 - **Watch together with official Jellyfin apps:** works, but those apps can still cause their own
   sync loops. Rollback-to-Rollback rooms are the smoothest.
 
