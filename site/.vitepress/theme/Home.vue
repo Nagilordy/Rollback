@@ -30,7 +30,7 @@ const features = [
         <a class="btn" :href="linux">Download for Linux</a>
         <a class="btn" :href="withBase('/guide/getting-started')">Read the guide</a>
       </div>
-      <p class="note">Version 0.3 · free · needs a Jellyfin server</p>
+      <p class="note">Version 0.1 · free · needs a Jellyfin server</p>
     </section>
 
     <section class="shot">
