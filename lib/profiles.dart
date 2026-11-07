@@ -27,10 +27,13 @@ import 'ui.dart';
 // ---------- What Rollback remembers ----------
 
 class _Saved {
-  _Saved(this.name, this.token, this.tag);
+  _Saved(this.name, this.token, this.tag, [this.app = 'Frame']);
   final String name;
   final String token;
   final String? tag;
+  // The app name the sign-in was made under (Jellyfin.tokenApp). Saved sign-ins without one
+  // are from before the rename, when the app was called Frame.
+  final String app;
 }
 
 /// Logins are kept per server, so switching between your NAS and a friend's server keeps
@@ -97,7 +100,8 @@ class ProfileStore {
       if (raw != null) {
         (jsonDecode(raw) as Map).forEach((id, v) {
           if (v is Map && v['token'] != null) {
-            out[id.toString()] = _Saved((v['name'] ?? '').toString(), v['token'].toString(), v['tag']?.toString());
+            out[id.toString()] = _Saved((v['name'] ?? '').toString(), v['token'].toString(), v['tag']?.toString(),
+                (v['app'] ?? 'Frame').toString());
           }
         });
       }
@@ -115,13 +119,14 @@ class ProfileStore {
     await p.setString(
         'profiles@$server',
         jsonEncode({
-          for (final e in all.entries) e.key: {'name': e.value.name, 'token': e.value.token, 'tag': e.value.tag}
+          for (final e in all.entries)
+            e.key: {'name': e.value.name, 'token': e.value.token, 'tag': e.value.tag, 'app': e.value.app}
         }));
   }
 
   static Future<void> remember(Jellyfin jf) async {
     final all = await profiles(jf.server);
-    all[jf.userId!] = _Saved(jf.userName ?? '', jf.token!, jf.userImageTag);
+    all[jf.userId!] = _Saved(jf.userName ?? '', jf.token!, jf.userImageTag, jf.tokenApp);
     await _write(jf.server, all);
     final p = await _p;
     await p.setString('lastUser@${jf.server}', jf.userId!);
@@ -442,6 +447,7 @@ class _StartScreenState extends State<StartScreen> {
     if (pick != null && s != null) {
       final jf = Jellyfin(server)
         ..token = s.token
+        ..tokenApp = s.app
         ..userId = pick
         ..userName = s.name
         ..userImageTag = s.tag;
@@ -568,6 +574,7 @@ class _WhoScreenState extends State<WhoScreen> {
     if (saved != null) {
       jf
         ..token = saved.token
+        ..tokenApp = saved.app
         ..userId = p.id;
       _openHome(context, jf);
       return;

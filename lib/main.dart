@@ -210,8 +210,17 @@ class Jellyfin {
     } catch (_) {}
   }
 
-  static String get _client =>
-      'MediaBrowser Client="Rollback", Device="$_deviceName", DeviceId="$_deviceId", Version="0.3"';
+  /// The app's name as Jellyfin sees it, for new sign-ins.
+  static const appName = 'Rollback';
+
+  /// The name this sign-in (token) was made with. Jellyfin ties a token's live connection to
+  /// the app name it was created under: requests sent under another name end up in a second
+  /// session that gets no room updates (Watch together then can't start or join). Sign-ins
+  /// from before the rename keep saying "Frame"; new ones say Rollback.
+  String tokenApp = appName;
+
+  String get _client =>
+      'MediaBrowser Client="${token == null ? appName : tokenApp}", Device="$_deviceName", DeviceId="$_deviceId", Version="0.3"';
 
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
@@ -272,6 +281,7 @@ class Jellyfin {
 
   void _signedIn(dynamic data) {
     token = data['AccessToken'];
+    tokenApp = appName; // made just now, under the current name
     userId = data['User']['Id'];
     userName = data['User']['Name']?.toString();
     userImageTag = data['User']['PrimaryImageTag']?.toString();
