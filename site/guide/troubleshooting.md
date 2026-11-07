@@ -23,4 +23,4 @@ If Rollback crashed or something misbehaves, the latest log file helps a lot:
 
 ## Report a problem
 
-Use the [bug report form](https://github.com/Nagilordy/Frame/issues/new?template=bug_report.yml) on GitHub (a free account is needed). It asks for everything needed to fix it. Ideas go in the [feature request form](https://github.com/Nagilordy/Frame/issues/new?template=feature_request.yml).
+Use the [bug report form](https://github.com/Nagilordy/Rollback/issues/new?template=bug_report.yml) on GitHub (a free account is needed). It asks for everything needed to fix it. Ideas go in the [feature request form](https://github.com/Nagilordy/Rollback/issues/new?template=feature_request.yml).

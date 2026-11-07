@@ -5,6 +5,6 @@ import './style.css'
 export default {
   extends: DefaultTheme,
   enhanceApp({ app }) {
-    app.component('FrameHome', Home)
+    app.component('RollbackHome', Home)
   },
 }

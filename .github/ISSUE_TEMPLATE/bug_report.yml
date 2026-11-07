@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for testing Rollback! The more of this you fill in, the faster it gets fixed.
-        One problem per report, please. Check the [open issues](https://github.com/Nagilordy/Frame/issues) first in case it's already known.
+        One problem per report, please. Check the [open issues](https://github.com/Nagilordy/Rollback/issues) first in case it's already known.
 
   - type: textarea
     id: what

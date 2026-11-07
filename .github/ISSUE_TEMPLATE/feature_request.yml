@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for the idea! Check the [open issues](https://github.com/Nagilordy/Frame/issues?q=is%3Aopen+label%3Aenhancement) first: if it's already there, add a 👍 to it instead (that's how we see what people want most).
+        Thanks for the idea! Check the [open issues](https://github.com/Nagilordy/Rollback/issues?q=is%3Aopen+label%3Aenhancement) first: if it's already there, add a 👍 to it instead (that's how we see what people want most).
 
   - type: textarea
     id: idea

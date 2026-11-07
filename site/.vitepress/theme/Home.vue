@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { withBase } from 'vitepress'
 
-const releases = 'https://github.com/Nagilordy/Frame/releases'
+const releases = 'https://github.com/Nagilordy/Rollback/releases'
 // Until the first full (non-test) release is out, both buttons open the Releases page.
 // After that they can point straight at the files:
 //   releases/latest/download/RollbackSetup.exe and releases/latest/download/Rollback-x86_64.AppImage
@@ -30,7 +30,7 @@ const features = [
         <a class="btn" :href="linux">Download for Linux</a>
         <a class="btn" :href="withBase('/guide/getting-started')">Read the guide</a>
       </div>
-      <p class="note">Version 0.3 · free · needs a Jellyfin server</p>
+      <p class="note">Version 0.1 · free · needs a Jellyfin server</p>
     </section>
 
     <section class="shot">
@@ -78,7 +78,7 @@ const features = [
         <a class="btn primary" :href="windows">Download for Windows</a>
         <a class="btn" :href="linux">Download for Linux</a>
       </div>
-      <p class="note">Found a problem? <a href="https://github.com/Nagilordy/Frame/issues/new?template=bug_report.yml">Report a bug</a> · Have an idea? <a href="https://github.com/Nagilordy/Frame/issues/new?template=feature_request.yml">Suggest it</a></p>
+      <p class="note">Found a problem? <a href="https://github.com/Nagilordy/Rollback/issues/new?template=bug_report.yml">Report a bug</a> · Have an idea? <a href="https://github.com/Nagilordy/Rollback/issues/new?template=feature_request.yml">Suggest it</a></p>
     </section>
   </div>
 </template>

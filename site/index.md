@@ -3,4 +3,4 @@ layout: page
 title: Rollback
 ---
 
-<FrameHome />
+<RollbackHome />
