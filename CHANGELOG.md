@@ -15,6 +15,12 @@ What changed in each version of Frame. Newest first.
   together. Up next is a card with the next episode's picture and a Play now button that
   fills up as the countdown runs. Starting a video shows the loading screen with the show's
   artwork and logo, where it resumes, and Cancel.
+- **Real HDR on Linux (Wayland).** On a desktop with HDR switched on (KDE Plasma 6, for
+  example), HDR films now play in real HDR10 inside Frame's player, up to your screen's peak
+  brightness, with the controls on top as before. SDR films and SDR screens get a normal
+  picture. Switching HDR on or off in the display settings during a film is followed within a
+  second. Info shows it under Your screen (for example "HDR · 800 nits"). Desktops without
+  HDR support keep the player drawn inside Frame's window.
 - **One player: Frame's own** (Windows and Linux). Every video, including Watch together and
   the server's version, plays in Frame's player, drawn inside Frame's window; no separate mpv
   window. HDR films are shown converted to a normal picture for now: real HDR comes later.

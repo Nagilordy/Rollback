@@ -28,7 +28,7 @@ import 'phone.dart';
 import 'playback_rules.dart';
 import 'gaming_mode.dart' show inGamingMode;
 import 'package:frame_video/frame_video.dart';
-import 'video_surface.dart' show surfaceWanted, surfacePlayerSkipped;
+import 'video_surface.dart' show surfaceWanted, surfacePlayerSkipped, hdrLayerWanted;
 import 'crash_reports.dart' show reportProblem;
 import 'downloads.dart' show Downloads;
 
@@ -110,7 +110,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       logLevel: _surface ? MPVLogLevel.info : (_phone ? MPVLogLevel.warn : MPVLogLevel.error),
       // Windows and Linux (X11): mpv's best renderer, drawing into the video surface under
       // Frame's window (its "wid" is set before the video opens). See "Full quality" below.
-      vo: _surface ? 'gpu-next' : null,
+      // Linux (Wayland): the render API, drawn into the HDR layer by frame_video.
+      vo: _hdrLayer ? 'libmpv' : (_surface ? 'gpu-next' : null),
       libass: _surface,
     ),
   );
@@ -123,7 +124,25 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   // window kept just under Frame's (packages/frame_video), and this screen is see-through, so
   // the controls sit on top of the picture: one app, one window. If the surface can't be made,
   // the player falls back to drawing inside Frame's window (normal picture).
-  bool _surface = !_phone && surfaceWanted;
+  bool _surface = !_phone && (surfaceWanted || hdrLayerWanted);
+
+  // ---------- HDR on Linux (Wayland): the HDR layer ----------
+  //
+  // The engine draws through libmpv's render API into a Wayland subsurface under Frame's window
+  // (packages/frame_video, hdr_surface.cc). When the video and the screen are HDR, the layer is
+  // described to the compositor as HDR10 and mpv outputs PQ up to the screen's peak, so KDE
+  // shows real HDR; otherwise it's a normal picture, converted by mpv. This screen is
+  // see-through over it, like with the video surface.
+  bool _hdrLayer = !_phone && !surfaceWanted && hdrLayerWanted;
+  HdrLayerInfo? _layer; // set once the layer is drawing
+
+  // Whether this video is HDR (HDR10, HDR10+, HLG or Dolby Vision), from Jellyfin.
+  bool get _videoIsHdr {
+    final streams = (widget.item['MediaStreams'] as List?) ?? [];
+    final video = streams.cast<dynamic>().firstWhere((s) => s['Type'] == 'Video', orElse: () => null);
+    final range = (video?['VideoRangeType'] ?? video?['VideoRange'] ?? '').toString();
+    return range.isNotEmpty && range != 'SDR' && range != 'Unknown';
+  }
   // Which commit this app was built from (set by the iPhone build workflow), to tell builds apart.
   static const String _build = String.fromEnvironment('FRAME_BUILD', defaultValue: 'dev');
   final List<String> _phoneLog = []; // the last few things mpv said (phones only)
@@ -316,6 +335,12 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       // Downloaded to this device: the file here, no server needed.
       url = Downloads.instance.localFile(_id) ?? widget.jf.directStreamUrl(_id);
     }
+    if (_layer != null) {
+      // HDR10 for an HDR original file on an HDR screen; the server's version, a normal picture.
+      final info = await FrameVideo.setHdr(_videoIsHdr && !server);
+      if (info != null) _layer = info;
+      _note(_layer!.hdr ? 'HDR layer: HDR10, screen peak ${_layer!.peak.round()} nits' : 'HDR layer: normal picture');
+    }
     if (mpv is NativePlayer) {
       // Exact seeks (not the nearest keyframe, which can be seconds away): Watch together
       // only accepts a position within half a second of the room's.
@@ -324,8 +349,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         // The server already fixed the colours: no conversion on this device.
         await mpv.setProperty('vf', '');
         await mpv.setProperty('hwdec', 'auto-safe');
-      } else if (_isDolbyVisionOnly && !_surface) {
-        // (Through the video surface, gpu-next applies Dolby Vision's colours itself.)
+      } else if (_isDolbyVisionOnly && (!_surface || _hdrLayer)) {
+        // (Through the video surface, gpu-next applies Dolby Vision's colours itself; the HDR
+        // layer's renderer doesn't, so it gets the filter too.)
         await _applyDvFilter();
       }
       if (at != null) await mpv.setProperty('start', (at.inMilliseconds / 1000).toStringAsFixed(1));
@@ -441,12 +467,17 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   static const _dvConvert = 'libplacebo=apply_dolbyvision=1'
       ':tonemapping=bt.2446a:colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv:format=yuv420p';
 
+  // On the HDR layer with an HDR screen: Dolby Vision's colours applied, kept as HDR10 (PQ,
+  // BT.2020) for the screen instead of converted to a normal picture.
+  static const _dvConvertHdr = 'libplacebo=apply_dolbyvision=1'
+      ':colorspace=bt2020nc:color_primaries=bt2020:color_trc=smpte2084:range=tv:format=yuv420p10le';
+
   // Decoded on the GPU, copied to the conversion step.
   Future<void> _applyDvFilter() async {
     final mpv = player.platform;
     if (mpv is! NativePlayer) return;
     await mpv.setProperty('hwdec', 'auto-copy-safe');
-    await mpv.setProperty('vf', 'lavfi=[$_dvConvert]');
+    await mpv.setProperty('vf', 'lavfi=[${_layer?.hdr == true ? _dvConvertHdr : _dvConvert}]');
   }
 
   // Dolby Vision with no HDR10 or SDR picture inside (Profile 5). Jellyfin calls it "DOVI";
@@ -889,6 +920,36 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   // draw ("No render context set": sound and time run, but no picture, on iPhone). The
   // controller is created here (it's lazy) and playback starts once it's ready.
   Future<void> _startWhenVideoReady() async {
+    if (_hdrLayer) {
+      _subs.add(player.stream.log.listen((l) => debugPrint('Player mpv: [${l.level}] ${l.prefix}: ${l.text.trim()}')));
+      final mpv = player.platform;
+      // Opened as a normal picture; _openSource switches it to HDR10 for an HDR file.
+      final info = mpv is NativePlayer ? await FrameVideo.openHdr(await mpv.handle, hdr: false) : null;
+      if (info != null) {
+        _layer = info;
+        // media_kit starts mpv with no video track (vid=no) and only its VideoController turns
+        // video on; the layer has no controller, so turn it on here or there's sound but no picture.
+        try {
+          await (mpv as NativePlayer).setProperty('vid', 'auto');
+        } catch (e) {
+          _note('vid=auto not accepted ($e)');
+        }
+        _note('drawing through the HDR layer (Wayland)');
+        if (mounted) _start();
+        return;
+      }
+      _note('no HDR layer; drawing inside the window');
+      if (_videoIsHdr) {
+        final (_, why) = await FrameVideo.hdrSupported();
+        surfacePlayerSkipped.value = "HDR isn't available on this desktop${why.isEmpty ? '' : ' ($why)'}";
+      }
+      if (mounted) {
+        setState(() {
+          _hdrLayer = false;
+          _surface = false;
+        });
+      }
+    }
     if (_surface) {
       // Step by step in the terminal, to find problems on new systems.
       debugPrint('Player: asking for the video surface');
@@ -1081,7 +1142,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         debugPrint('Player: Dolby Vision Profile 5 (colours fixed by libplacebo here, or by the server)');
       }
       // HDR to SDR conversion, without per-frame brightness measuring (heavy on small GPUs).
-      await mpv.setProperty('tone-mapping', 'bt.2446a');
+      // (The HDR layer's renderer has no bt.2446a; bt.2390 is its best curve.)
+      await mpv.setProperty('tone-mapping', _hdrLayer ? 'bt.2390' : 'bt.2446a');
       await mpv.setProperty('hdr-compute-peak', 'no');
       // Wait for a little data before the first frame, so the start doesn't stutter.
       await mpv.setProperty('cache-pause-initial', 'yes');
@@ -1186,9 +1248,15 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _tapTimer?.cancel();
     // Stop the engine before its surface goes, then make Frame's window solid again.
     final hadSurface = _surface;
-    player.dispose().whenComplete(() {
-      if (hadSurface) FrameVideo.close();
-    });
+    final layer = _layer;
+    if (layer != null) {
+      // The HDR layer holds the engine's render context, which has to go before the engine.
+      FrameVideo.closeHdr(layer.id).whenComplete(player.dispose);
+    } else {
+      player.dispose().whenComplete(() {
+        if (hadSurface) FrameVideo.close();
+      });
+    }
     _rootFocus.dispose();
     _playFocus.dispose();
     _backFocus.dispose();
@@ -1377,6 +1445,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     final ow = int.tryParse(await p('osd-width')) ?? 0;
     final oh = int.tryParse(await p('osd-height')) ?? 0;
     final quality = _qualityLine(widget.item);
+    // The HDR layer follows the screen by itself (HDR switched on or off during the film).
+    if (_layer != null) {
+      final now = await FrameVideo.hdrState();
+      if (now != null && now.open && now.id == _layer!.id) _layer = now;
+    }
     String fpsText(double f) => '${f.toStringAsFixed(3).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '')} fps';
     final video = [
       if (h > 0)
@@ -1408,7 +1481,12 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       (
         'Your screen',
         [
-          (targetGamma == 'pq' || targetGamma == 'hlg') ? 'HDR' : 'SDR',
+          // The HDR layer's renderer doesn't report its target (video-target-params is
+          // gpu-next only), so the layer says what it's showing, with the screen's peak.
+          if (_layer != null)
+            _layer!.hdr ? 'HDR · ${_layer!.peak.round()} nits' : 'SDR'
+          else
+            (targetGamma == 'pq' || targetGamma == 'hlg') ? 'HDR' : 'SDR',
           if (hz > 0) '${hz.round()} Hz',
           if (ow > 0) '$ow × $oh',
         ].join(' · ')

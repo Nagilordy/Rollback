@@ -24,7 +24,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
             libstdc++-12-dev libmpv-dev mpv file desktop-file-utils \
-            libcurl4-openssl-dev libx11-dev
+            libcurl4-openssl-dev libx11-dev dpkg-dev \
+            wayland-protocols libwayland-bin libwayland-dev libegl-dev
 
       - uses: subosito/flutter-action@v2
         with:

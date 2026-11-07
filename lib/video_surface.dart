@@ -24,5 +24,17 @@ bool get runningInX11 {
 // The surface (real HDR) comes back once it's been made reliable, Windows first.
 bool get surfaceWanted => false;
 
+/// Linux under Wayland: whether to draw through the HDR layer (packages/frame_video,
+/// hdr_surface.cc), a subsurface under Frame's window that the compositor shows as HDR10 when
+/// the video and the screen are HDR (KDE Plasma 6 with HDR on, for example). If the desktop
+/// can't (no colour management), the player draws inside Frame's window as before.
+/// FRAME_HDR_LAYER=0 turns it off.
+bool get hdrLayerWanted {
+  if (!Platform.isLinux) return false;
+  final env = Platform.environment;
+  if (env['FRAME_HDR_LAYER'] == '0') return false;
+  return !runningInX11 && (env['WAYLAND_DISPLAY'] ?? '').isNotEmpty;
+}
+
 /// Set when the surface couldn't be used (shown once as a banner by the app).
 final ValueNotifier<String?> surfacePlayerSkipped = ValueNotifier(null);
