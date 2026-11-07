@@ -146,5 +146,7 @@ The source is public so you can see how Rollback works and report problems. Plea
 redistribute Rollback or modified versions of it. Bug reports and ideas are very welcome; code
 contributions (pull requests) aren't being accepted for now.
 
+The full terms are in [LICENSE](LICENSE).
+
 Rollback uses open-source software (Jellyfin's API, mpv, Flutter, media_kit, Hanken Grotesk and Sora),
-each under its own license.
+each under its own license: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
