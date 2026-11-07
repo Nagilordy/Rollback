@@ -20,8 +20,8 @@ Friends on your server get an **invite** on their Home. They press **Triangle** 
 
 In Jellyfin, every profile needs **SyncPlay access**: **Dashboard → Users → *profile* → SyncPlay access**.
 
-Frame's instant sync mode also needs **Allow remote control of other users** for each profile that uses it.
+Rollback's instant sync mode also needs **Allow remote control of other users** for each profile that uses it.
 
 ::: info Official Jellyfin apps
-Parties work with the official Jellyfin apps too, but those can cause their own sync loops. Frame-to-Frame parties are the smoothest.
+Parties work with the official Jellyfin apps too, but those can cause their own sync loops. Rollback-to-Rollback parties are the smoothest.
 :::

@@ -1,16 +1,16 @@
-// Frame's video surface on Windows.
+// Rollback's video surface on Windows.
 //
-// open():  creates a borderless, black window ("the surface") exactly under Frame's window,
+// open():  creates a borderless, black window ("the surface") exactly under Rollback's window,
 //          the same size and place, and returns its handle. libmpv draws the video into it with
-//          its own renderer (Direct3D 11, HDR). Frame's window is made see-through (DWM glass
+//          its own renderer (Direct3D 11, HDR). Rollback's window is made see-through (DWM glass
 //          over its whole area), so where Flutter draws nothing, the video shows through, and
-//          Frame's controls sit on top.
-//          To keep the surface always just under Frame (never in front, never with another
-//          app in between), the surface becomes Frame's "owner" window: Windows always keeps
-//          an owned window above its owner. Frame is given WS_EX_APPWINDOW so it stays in the
+//          Rollback's controls sit on top.
+//          To keep the surface always just under Rollback (never in front, never with another
+//          app in between), the surface becomes Rollback's "owner" window: Windows always keeps
+//          an owned window above its owner. Rollback is given WS_EX_APPWINDOW so it stays in the
 //          taskbar; the surface is a tool window, so it never shows in the taskbar or Alt+Tab.
-// close(): gives Frame back its old owner and look, then destroys the surface (in that order:
-//          destroying an owner window would destroy Frame with it).
+// close(): gives Rollback back its old owner and look, then destroys the surface (in that order:
+//          destroying an owner window would destroy Rollback with it).
 
 #include "include/frame_video/frame_video_plugin_c_api.h"
 
@@ -28,13 +28,13 @@ namespace {
 
 const wchar_t kSurfaceClass[] = L"FrameVideoSurface";
 
-HWND g_frame = nullptr;    // Frame's top-level window
+HWND g_frame = nullptr;    // Rollback's top-level window
 HWND g_surface = nullptr;  // the video surface under it
 LONG_PTR g_old_owner = 0;
 LONG_PTR g_old_ex_style = 0;
 const UINT_PTR kSubclassId = 0xF7A3E;
 
-// Put the surface exactly over Frame's client area (screen coordinates), hidden while Frame is
+// Put the surface exactly over Rollback's client area (screen coordinates), hidden while Rollback is
 // minimised or hidden.
 void PlaceSurface() {
   if (!g_frame || !g_surface) return;
@@ -59,7 +59,7 @@ LRESULT CALLBACK FrameSubclass(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
       return result;
     }
     case WM_DESTROY:
-      // Frame is closing: let go of the surface first (see close()).
+      // Rollback is closing: let go of the surface first (see close()).
       if (g_surface) {
         SetWindowLongPtr(g_frame, GWLP_HWNDPARENT, g_old_owner);
         DestroyWindow(g_surface);
@@ -73,7 +73,7 @@ LRESULT CALLBACK FrameSubclass(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam
 LRESULT CALLBACK SurfaceProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
   switch (msg) {
     case WM_MOUSEACTIVATE:
-      return MA_NOACTIVATE;  // never take focus from Frame
+      return MA_NOACTIVATE;  // never take focus from Rollback
     case WM_ERASEBKGND: {
       RECT r;
       GetClientRect(hwnd, &r);
@@ -123,12 +123,12 @@ bool Open(HWND frame) {
   wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
   RegisterClassW(&wc);  // fails harmlessly if already registered
 
-  g_surface = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, kSurfaceClass, L"Frame video",
+  g_surface = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, kSurfaceClass, L"Rollback video",
                               WS_POPUP | WS_CLIPCHILDREN, 0, 0, 16, 16, nullptr, nullptr,
                               GetModuleHandle(nullptr), nullptr);
   if (!g_surface) return false;
 
-  // Keep the surface just under Frame: Frame becomes owned by the surface.
+  // Keep the surface just under Rollback: Rollback becomes owned by the surface.
   g_old_owner = GetWindowLongPtr(g_frame, GWLP_HWNDPARENT);
   g_old_ex_style = GetWindowLongPtr(g_frame, GWL_EXSTYLE);
   SetWindowLongPtr(g_frame, GWL_EXSTYLE, g_old_ex_style | WS_EX_APPWINDOW);
@@ -173,7 +173,7 @@ class FrameVideoPlugin : public flutter::Plugin {
       HWND view = registrar_->GetView() ? registrar_->GetView()->GetNativeWindow() : nullptr;
       HWND frame = view ? GetAncestor(view, GA_ROOT) : nullptr;
       if (!frame || !Open(frame)) {
-        result->Success();  // null: Frame falls back to its usual player
+        result->Success();  // null: Rollback falls back to its usual player
         return;
       }
       result->Success(flutter::EncodableValue(static_cast<int64_t>(reinterpret_cast<intptr_t>(g_surface))));

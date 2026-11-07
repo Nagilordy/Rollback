@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 const repo = 'https://github.com/Nagilordy/Frame'
 
 export default defineConfig({
-  title: 'Frame',
+  title: 'Rollback',
   description: 'Your Jellyfin library, the way a console would show it. A couch-first app for Jellyfin on Linux and Windows.',
   base: '/Frame/',
   cleanUrls: true,
@@ -13,12 +13,12 @@ export default defineConfig({
     ['link', { rel: 'icon', href: '/Frame/icon.svg' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Sora:wght@600;700&display=swap' }],
-    ['meta', { property: 'og:title', content: 'Frame' }],
+    ['meta', { property: 'og:title', content: 'Rollback' }],
     ['meta', { property: 'og:description', content: 'Your Jellyfin library, the way a console would show it.' }],
   ],
   themeConfig: {
     logo: '/mark.svg',
-    siteTitle: 'Frame',
+    siteTitle: 'Rollback',
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Download', link: '/download' },

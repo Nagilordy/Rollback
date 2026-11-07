@@ -41,7 +41,7 @@ target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 target_include_directories(${PLUGIN_NAME} INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter PkgConfig::GTK PkgConfig::X11 frame_video_hdr)
 
-# Checking the HDR layer without Frame: hdr_test <video> [seconds] [sdr] (not part of the app).
+# Checking the HDR layer without Rollback: hdr_test <video> [seconds] [sdr] (not part of the app).
 add_executable(frame_video_hdr_test EXCLUDE_FROM_ALL "tools/hdr_test.cc")
 target_link_libraries(frame_video_hdr_test PRIVATE frame_video_hdr)
 

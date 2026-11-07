@@ -1,4 +1,4 @@
-// Test for Frame's HDR video layer, without Frame: a see-through GTK window (like Frame's,
+// Test for Rollback's HDR video layer, without Rollback: a see-through GTK window (like Rollback's,
 // with a bar drawn on top like the player's controls) and the layer under it, playing a file.
 //
 //   hdr_test <video> [seconds] [sdr]
@@ -36,7 +36,7 @@ gboolean Draw(GtkWidget* widget, cairo_t* cr, gpointer) {
   cairo_select_font_face(cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
   cairo_set_font_size(cr, 26);
   cairo_move_to(cr, 32, h - 36);
-  cairo_show_text(cr, g_hdr ? "Frame HDR layer test (HDR10)" : "Frame HDR layer test (SDR)");
+  cairo_show_text(cr, g_hdr ? "Rollback HDR layer test (HDR10)" : "Rollback HDR layer test (SDR)");
   return TRUE;
 }
 
@@ -117,7 +117,7 @@ int main(int argc, char** argv) {
   gtk_init(&argc, &argv);
 
   GtkWidget* window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-  gtk_window_set_title(GTK_WINDOW(window), "Frame HDR test");
+  gtk_window_set_title(GTK_WINDOW(window), "Rollback HDR test");
   gtk_window_set_default_size(GTK_WINDOW(window), 1280, 720);
   GdkScreen* screen = gtk_window_get_screen(GTK_WINDOW(window));
   if (GdkVisual* visual = gdk_screen_get_rgba_visual(screen)) {

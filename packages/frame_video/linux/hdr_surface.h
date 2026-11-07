@@ -1,13 +1,13 @@
-// Frame's HDR video layer on Linux (Wayland).
+// Rollback's HDR video layer on Linux (Wayland).
 //
-// A Wayland subsurface kept just under Frame's window, where libmpv draws the video through
+// A Wayland subsurface kept just under Rollback's window, where libmpv draws the video through
 // its render API on a 10-bit EGL surface. For HDR videos the layer is described to the
 // compositor as HDR10 (PQ, BT.2020) with wp_color_manager_v1, and mpv is told to output PQ up
 // to the screen's real peak brightness (read from the compositor), so KWin passes the picture
 // to an HDR screen without converting it. SDR videos keep a plain sRGB layer.
 //
-// Frame's window is see-through where Flutter draws nothing, so the video shows through and
-// Frame's controls sit on top: one window, the compositor puts the two together.
+// Rollback's window is see-through where Flutter draws nothing, so the video shows through and
+// Rollback's controls sit on top: one window, the compositor puts the two together.
 
 #pragma once
 
@@ -29,7 +29,7 @@ struct HdrInfo {
 // supports parametric PQ / BT.2020). Fills `why` with a short reason when it can't.
 bool HdrSupported(GtkWidget* view, const char** why);
 
-// Creates the layer under `view` (Frame's FlView) and starts drawing `mpv` into it. mpv must
+// Creates the layer under `view` (Rollback's FlView) and starts drawing `mpv` into it. mpv must
 // have been created with vo=libmpv and no other render context. `hdr` picks HDR10 or sRGB.
 // Returns nullptr on failure (logged).
 HdrSurface* HdrOpen(GtkWidget* view, mpv_handle* mpv, bool hdr, HdrInfo* info);

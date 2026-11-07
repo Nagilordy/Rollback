@@ -140,7 +140,7 @@ class FadingShade extends StatelessWidget {
 
 // ---------- Surfaces: everything that pops up ----------
 //
-// Frame's design has two layers (the way TV interfaces from Google, Sony and Netflix work):
+// Rollback's design has two layers (the way TV interfaces from Google, Sony and Netflix work):
 //  - over the artwork (Home, show pages, the player): translucent pill buttons; selected =
 //    solid white.
 //  - anything that pops up (menus, panels, the keyboard, notifications): one solid dark
@@ -150,7 +150,7 @@ class FadingShade extends StatelessWidget {
 
 const kSurface = Color(0xFF1A1E25);
 
-/// The profile colour of whoever is using Frame (set when a profile opens Home).
+/// The profile colour of whoever is using Rollback (set when a profile opens Home).
 Color kAccent = const Color(0xFF6F8CFF);
 
 class Surface extends StatelessWidget {

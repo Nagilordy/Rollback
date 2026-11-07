@@ -79,7 +79,7 @@ String _qualityLine(dynamic item) {
 
 // ---------- The screen ----------
 
-/// The screen that plays a video. Every video plays in Frame's own player.
+/// The screen that plays a video. Every video plays in Rollback's own player.
 /// With [sync], the video plays in a Watch together room: play, pause and seek go through the
 /// room, so everyone stays together.
 Widget playerScreen(Jellyfin jf, dynamic item, {SyncPlay? sync, String? playlistItemId, int? startTicks}) =>
@@ -109,7 +109,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       // sound outputs it opened, to find problems on new systems.)
       logLevel: _surface ? MPVLogLevel.info : (_phone ? MPVLogLevel.warn : MPVLogLevel.error),
       // Windows and Linux (X11): mpv's best renderer, drawing into the video surface under
-      // Frame's window (its "wid" is set before the video opens). See "Full quality" below.
+      // Rollback's window (its "wid" is set before the video opens). See "Full quality" below.
       // Linux (Wayland): the render API, drawn into the HDR layer by frame_video.
       vo: _hdrLayer ? 'libmpv' : (_surface ? 'gpu-next' : null),
       libass: _surface,
@@ -121,14 +121,14 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   //
   // Instead of handing each frame to Flutter as a normal picture (no HDR), the engine draws
   // with mpv's best renderer (gpu-next: real HDR, Dolby Vision, smooth motion, 4K) into a
-  // window kept just under Frame's (packages/frame_video), and this screen is see-through, so
+  // window kept just under Rollback's (packages/frame_video), and this screen is see-through, so
   // the controls sit on top of the picture: one app, one window. If the surface can't be made,
-  // the player falls back to drawing inside Frame's window (normal picture).
+  // the player falls back to drawing inside Rollback's window (normal picture).
   bool _surface = !_phone && (surfaceWanted || hdrLayerWanted);
 
   // ---------- HDR on Linux (Wayland): the HDR layer ----------
   //
-  // The engine draws through libmpv's render API into a Wayland subsurface under Frame's window
+  // The engine draws through libmpv's render API into a Wayland subsurface under Rollback's window
   // (packages/frame_video, hdr_surface.cc). When the video and the screen are HDR, the layer is
   // described to the compositor as HDR10 and mpv outputs PQ up to the screen's peak, so KDE
   // shows real HDR; otherwise it's a normal picture, converted by mpv. This screen is
@@ -1004,7 +1004,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         if (mounted) _start();
         return;
       }
-      // No surface: draw inside Frame's window instead (normal picture).
+      // No surface: draw inside Rollback's window instead (normal picture).
       _note('no video surface; drawing inside the window');
       surfacePlayerSkipped.value = "full-quality video couldn't start on this system, so HDR is off";
       if (mounted) setState(() => _surface = false);
@@ -1022,7 +1022,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _note('video surface NOT ready after ${watch.elapsedMilliseconds} ms ($e); starting anyway');
       reportProblem('Video surface not ready', details: {'error': '$e'.split('\n').first});
       if ('$e'.contains('MissingPluginException')) {
-        _note('this copy of Frame was built without its video player part (build $_build): '
+        _note('this copy of Rollback was built without its video player part (build $_build): '
             'no picture for any video, original or server. Install the newest build.');
       }
     }
@@ -1249,7 +1249,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (Downloads.instance.localFile(_id) != null && _ticksNow > 0) Downloads.instance.savePosition(_id, _ticksNow);
     if (_phone) WidgetsBinding.instance.removeObserver(this);
     _tapTimer?.cancel();
-    // Stop the engine before its surface goes, then make Frame's window solid again.
+    // Stop the engine before its surface goes, then make Rollback's window solid again.
     final hadSurface = _surface;
     final layer = _layer;
     if (layer != null) {
@@ -1641,7 +1641,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       autofocus: true,
       onKeyEvent: _onKey,
       child: Scaffold(
-        // See-through over the video surface (the picture is drawn behind Frame's window).
+        // See-through over the video surface (the picture is drawn behind Rollback's window).
         backgroundColor: _surface ? Colors.transparent : Colors.black,
         body: MouseRegion(
           cursor: _controls ? SystemMouseCursors.basic : SystemMouseCursors.none,
@@ -1804,7 +1804,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   // ---------- Phones: leaving the app ----------
   //
   // iOS doesn't let an app draw with the GPU (OpenGL, which mpv uses) while it's in the
-  // background, and stops apps that try. So when Frame leaves the screen (home, another app,
+  // background, and stops apps that try. So when Rollback leaves the screen (home, another app,
   // the phone locked), the video pauses and mpv stops decoding the picture. Coming back, the
   // picture returns where it was, paused, with the controls up. In a watch party the video
   // isn't paused (that would pause everyone); only the picture stops while you're away.
@@ -2653,7 +2653,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
   static const _sheet = Color(0xFF12151B);
   static const _cardInk = Color(0xFF3B4250); // second line on a selected (white) card
-  // Selected: a dark gap, then a white ring, like everything selected in Frame.
+  // Selected: a dark gap, then a white ring, like everything selected in Rollback.
   static const _ringOn = [BoxShadow(color: _sheet, spreadRadius: 4), BoxShadow(color: _fg, spreadRadius: 9)];
   static const _tvTabs = [_Panel.audio, _Panel.subtitles, _Panel.playback, _Panel.info];
   final _tabFocus = [for (var i = 0; i < 4; i++) FocusNode()];

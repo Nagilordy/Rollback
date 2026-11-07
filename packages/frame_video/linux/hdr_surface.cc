@@ -1,4 +1,4 @@
-// Frame's HDR video layer on Linux (Wayland). See hdr_surface.h.
+// Rollback's HDR video layer on Linux (Wayland). See hdr_surface.h.
 
 #include "hdr_surface.h"
 
@@ -226,7 +226,7 @@ void HdrSurface::Place() {
     }
     wake.notify_one();
   }
-  // The position applies with Frame's window's next commit.
+  // The position applies with Rollback's window's next commit.
   gtk_widget_queue_draw(top);
   wl_display_flush(display);
 }
@@ -517,7 +517,7 @@ HdrSurface* HdrOpen(GtkWidget* view, mpv_handle* mpv, bool hdr, HdrInfo* info) {
   }
   wl_surface* parent = gdk_wayland_window_get_wl_surface(top_window);
   if (!parent) {
-    g_message("frame_video hdr: Frame's window has no Wayland surface yet");
+    g_message("frame_video hdr: Rollback's window has no Wayland surface yet");
     return nullptr;
   }
 
@@ -535,11 +535,11 @@ HdrSurface* HdrOpen(GtkWidget* view, mpv_handle* mpv, bool hdr, HdrInfo* info) {
     return nullptr;
   }
 
-  // The layer: a subsurface just under Frame's window, ignoring input (clicks go to Frame).
+  // The layer: a subsurface just under Rollback's window, ignoring input (clicks go to Rollback).
   s->surface = wl_compositor_create_surface(s->g.compositor);
   s->subsurface = wl_subcompositor_get_subsurface(s->g.subcompositor, s->surface, parent);
   wl_subsurface_place_below(s->subsurface, parent);
-  wl_subsurface_set_desync(s->subsurface);  // video frames don't wait for Frame's window
+  wl_subsurface_set_desync(s->subsurface);  // video frames don't wait for Rollback's window
   wl_region* empty = wl_compositor_create_region(s->g.compositor);
   wl_surface_set_input_region(s->surface, empty);
   wl_region_destroy(empty);

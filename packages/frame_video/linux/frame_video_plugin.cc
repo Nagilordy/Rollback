@@ -1,13 +1,13 @@
-// Frame's video surface on Linux (X11).
+// Rollback's video surface on Linux (X11).
 //
-// open():  creates a borderless, black X11 window ("the surface") exactly under Frame's window,
+// open():  creates a borderless, black X11 window ("the surface") exactly under Rollback's window,
 //          the same size and place, and returns its X window id. libmpv draws the video into it
-//          (its "wid") with its own renderer (gpu-next). Frame's window is see-through where
+//          (its "wid") with its own renderer (gpu-next). Rollback's window is see-through where
 //          Flutter draws nothing (the runner gives it an RGBA visual and a clear background), so
-//          the video shows through and Frame's controls sit on top.
-//          The surface skips the taskbar and pager and never takes focus. Each time Frame moves,
+//          the video shows through and Rollback's controls sit on top.
+//          The surface skips the taskbar and pager and never takes focus. Each time Rollback moves,
 //          resizes, is raised or minimised, the surface follows: same place, stacked right
-//          under Frame (asked of the window manager, so it works with KWin, Mutter, gamescope).
+//          under Rollback (asked of the window manager, so it works with KWin, Mutter, gamescope).
 // close(): destroys the surface.
 // Under Wayland there are no X window ids: open() answers null. Wayland has its own layer
 // instead (openHdr / setHdr / closeHdr, hdr_surface.cc): libmpv's render API on a subsurface
@@ -37,7 +37,7 @@ Window FrameXid() {
   return gw ? gdk_x11_window_get_xid(gw) : 0;
 }
 
-// Same place and size as Frame's window contents, stacked just under Frame.
+// Same place and size as Rollback's window contents, stacked just under Rollback.
 void Place() {
   if (!g_surface || !g_window) return;
   GdkDisplay* trap_display = gtk_widget_get_display(GTK_WIDGET(g_window));
@@ -99,7 +99,7 @@ Window Open(GtkWindow* window) {
     return 0;
   }
 
-  XStoreName(g_display, g_surface, "Frame video");
+  XStoreName(g_display, g_surface, "Rollback video");
   // Never takes focus.
   XWMHints hints;
   std::memset(&hints, 0, sizeof(hints));
@@ -123,7 +123,7 @@ Window Open(GtkWindow* window) {
   XSync(g_display, False);
   const gint error = gdk_x11_display_error_trap_pop(gd);
   if (error) g_message("frame_video: setting up the surface gave X error %d", error);
-  g_message("frame_video: surface 0x%lx created, following Frame's window", g_surface);
+  g_message("frame_video: surface 0x%lx created, following Rollback's window", g_surface);
 
   GtkWidget* w = GTK_WIDGET(window);
   g_handlers[0] = g_signal_connect(w, "configure-event", G_CALLBACK(OnFrameEvent), nullptr);
@@ -238,7 +238,7 @@ void OnMethodCall(FlMethodChannel* channel, FlMethodCall* call, gpointer) {
 
 void frame_video_plugin_register_with_registrar(FlPluginRegistrar* registrar) {
   // Keep our own reference: the app's plugin registration releases its reference right after
-  // this call, and the registrar is needed later (when a video opens) to find Frame's window.
+  // this call, and the registrar is needed later (when a video opens) to find Rollback's window.
   g_registrar = FL_PLUGIN_REGISTRAR(g_object_ref(registrar));
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
   FlMethodChannel* channel = fl_method_channel_new(fl_plugin_registrar_get_messenger(registrar), "frame/video",

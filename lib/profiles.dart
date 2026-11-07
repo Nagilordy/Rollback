@@ -1,9 +1,9 @@
 // Who's watching: finding the server, picking a profile, signing in, and the profile menu on
-// Home. Same look as the rest of Frame (dark, glass, Sora titles), console-style:
+// Home. Same look as the rest of Rollback (dark, glass, Sora titles), console-style:
 // big round avatars in a row, the selected one grows with a white ring and lights the room
 // in its colour.
 //
-// Each profile signs in once per PC; Frame keeps its login, so after that picking it opens
+// Each profile signs in once per PC; Rollback keeps its login, so after that picking it opens
 // Home straight away. Without a password, no sign-in at all. With one: Quick Connect (approve
 // a code from Jellyfin on your phone, nothing to type) or the password.
 
@@ -24,7 +24,7 @@ import 'phone.dart';
 import 'syncplay.dart' show SyncPlay, showPartyMenu, showStartParty;
 import 'ui.dart';
 
-// ---------- What Frame remembers ----------
+// ---------- What Rollback remembers ----------
 
 class _Saved {
   _Saved(this.name, this.token, this.tag);
@@ -38,7 +38,7 @@ class _Saved {
 class ProfileStore {
   static Future<SharedPreferences> get _p => SharedPreferences.getInstance();
 
-  /// The server Frame opens on.
+  /// The server Rollback opens on.
   static Future<String?> server() async => (await _p).getString('server');
 
   /// Every server signed in to on this PC, with its name.
@@ -102,7 +102,7 @@ class ProfileStore {
         });
       }
     } catch (_) {}
-    // The single login saved by the first versions of Frame.
+    // The single login saved by the first versions of Rollback.
     final oldToken = p.getString('token'), oldUser = p.getString('userId');
     if (legacy && oldToken != null && oldUser != null && !out.containsKey(oldUser)) {
       out[oldUser] = _Saved('', oldToken, null);
@@ -601,7 +601,7 @@ class _WhoScreenState extends State<WhoScreen> {
             color: glow,
             center: const Alignment(0, -0.05),
             child: Stack(children: [
-              Positioned(left: 120, top: 56, child: Text('Frame', style: tvDisplay(34))),
+              Positioned(left: 120, top: 56, child: Text('Rollback', style: tvDisplay(34))),
               // The time, top right, like the control center.
               Positioned(
                 right: 120,
@@ -997,7 +997,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     const SizedBox(height: 22),
                     Text(p?.name ?? 'Add a profile', style: tvDisplay(52)),
                     const SizedBox(height: 12),
-                    Text('Sign in once. Frame remembers this profile on this PC.', style: tvBody(24, color: kMuted)),
+                    Text('Sign in once. Rollback remembers this profile on this PC.', style: tvBody(24, color: kMuted)),
                   ]),
                 ),
                 Positioned(
@@ -1041,7 +1041,7 @@ class _SignInScreenState extends State<SignInScreen> {
                               const Spacer(),
                               Text(_qcNote ?? 'Getting a code…', style: tvBody(21, color: kMuted)),
                               const SizedBox(height: 12),
-                              // A thin running line while Frame waits for the approval.
+                              // A thin running line while Rollback waits for the approval.
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(2),
                                 child: LinearProgressIndicator(
@@ -1252,7 +1252,7 @@ class _ServerScreenState extends State<ServerScreen> {
     if (isPhone(context)) return _phoneBuild(context);
     final searching = _found == null;
     final found = _found ?? const <({String name, String address})>[];
-    final first = widget.current == null; // Frame's very first screen
+    final first = widget.current == null; // Rollback's very first screen
     return PadHints(
       hints: [const PadHint(PadButton.select, 'Select'), if (!first) const PadHint(PadButton.back, 'Back')],
       child: _backOnEscape(
@@ -1263,7 +1263,7 @@ class _ServerScreenState extends State<ServerScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(120, 96, 120, 0),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                // Title, and what Frame is doing.
+                // Title, and what Rollback is doing.
                 Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(first ? 'WELCOME TO FRAME' : 'SERVER',
@@ -1348,7 +1348,7 @@ class _ServerScreenState extends State<ServerScreen> {
   // ---------- Phone layout ----------
   //
   // Upright: your servers (the one in use white and marked Connected, the others to switch
-  // to, swipe left to forget one), then what Frame finds on the Wi-Fi, and Add for an address.
+  // to, swipe left to forget one), then what Rollback finds on the Wi-Fi, and Add for an address.
   // Sideways: the title and Add on the left, the lists on the right.
 
   bool _phoneRotationSet = false;
@@ -1467,7 +1467,7 @@ class _ServerScreenState extends State<ServerScreen> {
     final upright = isUpright(context);
     final pad = MediaQuery.paddingOf(context);
     final m = phoneMargins(context, min: upright ? 20 : 44);
-    final first = widget.current == null; // Frame's very first screen
+    final first = widget.current == null; // Rollback's very first screen
     final canBack = !first && Navigator.of(context).canPop();
     final searching = _network == null;
     final network = _network ?? const <({String name, String address})>[];

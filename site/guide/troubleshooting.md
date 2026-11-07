@@ -1,6 +1,6 @@
 # Troubleshooting
 
-## Frame can't reach my server
+## Rollback can't reach my server
 
 - Check the server (or NAS) is on and connected, then press **Retry**.
 - On another device, open the same address in a browser. If Jellyfin doesn't open there either, the problem is the server or the network.
@@ -16,10 +16,10 @@ Check the server settings on the [Watch parties](/guide/watch-party#what-the-ser
 
 ## Logs
 
-If Frame crashed or something misbehaves, the latest log file helps a lot:
+If Rollback crashed or something misbehaves, the latest log file helps a lot:
 
 - **Linux:** `~/.local/share/frame/logs/`
-- **Windows:** `%APPDATA%\Frame\logs\`
+- **Windows:** `%APPDATA%\Rollback\logs\`
 
 ## Report a problem
 

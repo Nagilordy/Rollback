@@ -1,12 +1,12 @@
-// Watch together, built on Jellyfin's own SyncPlay, so a Frame user and someone on the
+// Watch together, built on Jellyfin's own SyncPlay, so a Rollback user and someone on the
 // Jellyfin website or app can share the same room.
 //
 // How it works: rooms ("groups") live on the Jellyfin server. Everyone asks the server to
 // play, pause or seek; the server tells everyone what to do and exactly when (in server time),
-// so the pictures stay together. Frame keeps a clock offset to the server (like NTP) to act at
+// so the pictures stay together. Rollback keeps a clock offset to the server (like NTP) to act at
 // the right moment, and gently nudges its speed to stay in step (see player.dart).
 //
-// Frame adds what Jellyfin's version lacks: a Watch together button next to Play, rooms you
+// Rollback adds what Jellyfin's version lacks: a Watch together button next to Play, rooms you
 // can see and join from Home, who's in the room on screen, and notes like "Bob paused".
 
 import 'dart:async';
@@ -72,7 +72,7 @@ class SyncPlay {
   // When anyone in the party starts something, it opens here by itself if you're not already
   // watching.
 
-  /// Frame's navigator, so a video someone starts can open from any screen (set in main).
+  /// Rollback's navigator, so a video someone starts can open from any screen (set in main).
   static GlobalKey<NavigatorState>? navigator;
 
   int _playersOpen = 0; // room players open right now on this PC
@@ -112,19 +112,30 @@ class SyncPlay {
     _pushRoomPlayer(nav, jf, this).whenComplete(() => _opening = false);
   }
 
-  // ---------- Frame's own instant channel ----------
+  // ---------- Rollback's own instant channel ----------
   //
-  // Frames in a room send each other short messages through Jellyfin's live connection
+  // Rollbacks in a room send each other short messages through Jellyfin's live connection
   // ("SendString" commands between sessions). No server-side waiting: whoever presses play,
   // pause or seek sees it at once, and the other screens follow within a few milliseconds.
   // It needs "Allow remote control of other users" on each profile (Jellyfin's rule for
   // sending anything to another person's session). Without it, rooms use Jellyfin's
   // Watch Together (SyncPlay) as before.
 
-  static const directTag = ' (Frame)';
+  static const directTag = ' (Rollback)';
+  // Rooms and copies from before the rename (the app was called Frame) still count.
+  static const _oldDirectTag = ' (Frame)';
+  static const clientNames = {'Rollback', 'Frame'};
+
+  /// The room name without its instant-sync tag, and whether it had one (either name).
+  static (String, bool) splitDirectTag(String name) {
+    for (final tag in const [directTag, _oldDirectTag]) {
+      if (name.endsWith(tag)) return (name.substring(0, name.length - tag.length), true);
+    }
+    return (name, false);
+  }
   static const _prefix = 'frame-together:';
-  bool direct = false; // this room uses Frame's channel
-  bool isHost = false; // this Frame opened the room (it keeps time)
+  bool direct = false; // this room uses Rollback's channel
+  bool isHost = false; // this Rollback opened the room (it keeps time)
   String? _mySession;
   List<String> _peers = [];
   DateTime _peersAt = DateTime(0);
@@ -142,7 +153,7 @@ class SyncPlay {
     }
   }
 
-  // Tell Jellyfin this Frame can receive messages (needed to be reachable at all).
+  // Tell Jellyfin this Rollback can receive messages (needed to be reachable at all).
   Future<void> _announce() async {
     try {
       await jf.postPath('/Sessions/Capabilities/Full', {
@@ -153,11 +164,11 @@ class SyncPlay {
       final mine = await jf.getPath('/Sessions?deviceId=${Uri.encodeQueryComponent(Jellyfin.deviceId)}');
       if (mine is List && mine.isNotEmpty) _mySession = mine.first['Id']?.toString();
     } catch (e) {
-      debugPrint('Together: could not announce this Frame: $e');
+      debugPrint('Together: could not announce this Rollback: $e');
     }
   }
 
-  // The other Frames in this room (their sessions), refreshed every few seconds.
+  // The other Rollbacks in this room (their sessions), refreshed every few seconds.
   Future<List<String>> _roomPeers({bool fresh = false}) async {
     if (!fresh && DateTime.now().difference(_peersAt) < const Duration(seconds: 8)) return _peers;
     final people = group.value?.people.toSet() ?? <String>{};
@@ -165,7 +176,7 @@ class SyncPlay {
       final list = await jf.getPath('/Sessions?controllableByUserId=${jf.userId}&activeWithinSeconds=900');
       _peers = [
         for (final s in (list as List))
-          if (s['Client'] == 'Frame' &&
+          if (SyncPlay.clientNames.contains(s['Client']) &&
               s['Id']?.toString() != _mySession &&
               s['DeviceId']?.toString() != Jellyfin.deviceId &&
               people.contains(s['UserName']?.toString()))
@@ -173,12 +184,12 @@ class SyncPlay {
       ];
       _peersAt = DateTime.now();
     } catch (e) {
-      debugPrint('Together: could not find the other Frames: $e');
+      debugPrint('Together: could not find the other Rollbacks: $e');
     }
     return _peers;
   }
 
-  /// Sends a message to every other Frame in the room.
+  /// Sends a message to every other Rollback in the room.
   Future<void> sendDirect(Map<String, dynamic> message, {bool freshPeers = false}) async {
     final peers = await _roomPeers(fresh: freshPeers);
     final body = {
@@ -193,7 +204,7 @@ class SyncPlay {
     }
   }
 
-  /// Server time in milliseconds (all Frames agree on it within a few ms).
+  /// Server time in milliseconds (all Rollbacks agree on it within a few ms).
   int serverMs() => serverNow().millisecondsSinceEpoch;
 
   DateTime serverNow() => DateTime.now().toUtc().add(_offset);
@@ -457,7 +468,7 @@ class SyncPlay {
   }
 
   // ---------- Debug log (for comparing with the server's log) ----------
-  // together-YYYY-MM-DD.log in Frame's log folder (see perf.dart).
+  // together-YYYY-MM-DD.log in Rollback's log folder (see perf.dart).
   static final AppLog _log = AppLog('together');
   void log(String message) => _log(message);
 }
@@ -504,7 +515,7 @@ Future<void> startParty(BuildContext context, Jellyfin jf) async {
   _toast(context, 'Starting a watch party…');
   try {
     final direct = await sync.canDirect();
-    await sync.create('${jf.userName ?? 'Frame'} · Watch party${direct ? SyncPlay.directTag : ''}');
+    await sync.create('${jf.userName ?? 'Rollback'} · Watch party${direct ? SyncPlay.directTag : ''}');
     sync.direct = direct;
     sync.isHost = true;
     await sync.setIgnoreWait(true); // nobody is watching yet
@@ -556,12 +567,12 @@ Future<void> startWatchTogether(BuildContext context, Jellyfin jf, dynamic item)
     final title = item['Type'] == 'Episode'
         ? '${item['SeriesName'] ?? ''} S${item['ParentIndexNumber'] ?? '?'} E${item['IndexNumber'] ?? '?'}'
         : (item['Name'] ?? 'a movie').toString();
-    // Frame's instant channel when this profile is allowed to use it; otherwise Jellyfin's.
+    // Rollback's instant channel when this profile is allowed to use it; otherwise Jellyfin's.
     final direct = await sync.canDirect();
-    await sync.create('${jf.userName ?? 'Frame'} · $title${direct ? SyncPlay.directTag : ''}');
+    await sync.create('${jf.userName ?? 'Rollback'} · $title${direct ? SyncPlay.directTag : ''}');
     sync.direct = direct;
     sync.isHost = true;
-    if (!direct) debugPrint("Together: using Jellyfin's Watch Together (this profile can't use Frame's instant channel)");
+    if (!direct) debugPrint("Together: using Jellyfin's Watch Together (this profile can't use Rollback's instant channel)");
     final resume = (item['UserData']?['PlaybackPositionTicks'] ?? 0) as int;
     await sync.play(item['Id'].toString(), resume);
     if (!context.mounted) return;
@@ -585,9 +596,9 @@ Future<void> joinWatchTogether(BuildContext context, Jellyfin jf, String groupId
     }
     final name = sync.group.value?.name ?? '';
     sync.isHost = false;
-    sync.direct = name.endsWith(SyncPlay.directTag);
+    sync.direct = SyncPlay.splitDirectTag(name).$2;
     if (sync.direct && !await sync.canDirect()) {
-      throw "This room uses Frame's instant sync. Ask the server's admin to allow "
+      throw "This room uses Rollback's instant sync. Ask the server's admin to allow "
           '"remote control of other users" for your profile (Dashboard › Users).';
     }
     // Nothing playing yet (a party waiting for someone to pick): stay here, it opens by
@@ -670,7 +681,7 @@ class _TogetherPillState extends State<TogetherPill> {
     }
   }
 
-  // Someone opened a room (in Frame or in Jellyfin): invite card on Home, once per room.
+  // Someone opened a room (in Rollback or in Jellyfin): invite card on Home, once per room.
   void _maybeInvite(List<dynamic> rooms) {
     final me = widget.jf.userName;
     for (final r in rooms) {
@@ -1035,8 +1046,7 @@ Widget _avatar(String name, double size, {Color? ring}) => Container(
 // A room's starter and what it's watching, from its name ("Sam · Frieren · S1 · E4").
 (String host, String what) _roomParts(dynamic room) {
   final people = ((room['Participants'] as List?) ?? []).map((p) => p.toString()).toList();
-  var name = (room['GroupName'] ?? '').toString();
-  if (name.endsWith(SyncPlay.directTag)) name = name.substring(0, name.length - SyncPlay.directTag.length);
+  final name = SyncPlay.splitDirectTag((room['GroupName'] ?? '').toString()).$1;
   final cut = name.indexOf(' · ');
   final host = cut > 0 ? name.substring(0, cut) : (people.isEmpty ? 'Someone' : people.first);
   var what = cut > 0 ? name.substring(cut + 3) : '';
@@ -1273,10 +1283,10 @@ Widget watchTogetherButton(bool focused) => AnimatedContainer(
 void showInvite(BuildContext context, Jellyfin jf, dynamic room) {
   final people = ((room['Participants'] as List?) ?? []).map((p) => p.toString()).toList();
   final who = people.isEmpty ? 'Someone' : people.first;
-  // Room names from Frame read "Name · Title": show the title part.
+  // Room names from Rollback read "Name · Title": show the title part.
   final name = (room['GroupName'] ?? '').toString();
   var what = name.contains(' · ') ? name.substring(name.indexOf(' · ') + 3) : name;
-  if (what.endsWith(SyncPlay.directTag)) what = what.substring(0, what.length - SyncPlay.directTag.length);
+  what = SyncPlay.splitDirectTag(what).$1;
   final (a, b) = _accentOf(who);
   showBanner(
     context,
@@ -1311,7 +1321,7 @@ void showInvite(BuildContext context, Jellyfin jf, dynamic room) {
 
 // ---------- Following a room, for any player ----------
 //
-// The rules for Frame's player: your play, pause and seek go to the room; the room's
+// The rules for Rollback's player: your play, pause and seek go to the room; the room's
 // commands are carried out at the exact moment on the server's clock; small drift is closed by playing up to 5% faster or slower.
 
 typedef RoomVideo = ({String itemId, String playlistItemId, int startTicks, bool playing});
@@ -1326,7 +1336,7 @@ abstract class RoomLink {
   Future<void> ready();
   void stalled(bool stalled);
 
-  /// Frame's instant channel when the room uses it, Jellyfin's Watch Together otherwise.
+  /// Rollback's instant channel when the room uses it, Jellyfin's Watch Together otherwise.
   static RoomLink create({
     required SyncPlay sync,
     required String playlistItemId,
@@ -1379,7 +1389,7 @@ abstract class RoomLink {
 
 // When to tell the room "my video stopped" (Buffer), following what testing showed:
 //  - only a stall that lasts 0.7 s or more counts; shorter ones fix themselves
-//  - stalls Frame caused itself (a jump to obey the room) don't count, for a moment after the
+//  - stalls Rollback caused itself (a jump to obey the room) don't count, for a moment after the
 //    jump and while a Ready is on its way
 //  - at most one Buffer a second, and the Ready never follows it back to back
 //  - the last half second of a video never counts
@@ -1398,11 +1408,11 @@ class StallGate {
   Timer? _timer;
   bool reported = false; // a Buffer went out and its Ready hasn't yet
   bool _stalled = false;
-  bool hold = false; // a jump Frame made is settling: its Ready is coming anyway
+  bool hold = false; // a jump Rollback made is settling: its Ready is coming anyway
   DateTime _muteUntil = DateTime(0);
   DateTime _lastBuffer = DateTime(0);
 
-  /// Frame is about to jump or change speed itself: the stall that follows isn't news.
+  /// Rollback is about to jump or change speed itself: the stall that follows isn't news.
   void selfAction([Duration quiet = const Duration(milliseconds: 1500)]) {
     final until = DateTime.now().add(quiet);
     if (until.isAfter(_muteUntil)) _muteUntil = until;
@@ -1770,7 +1780,7 @@ class RoomFollower extends RoomLink {
   }
 }
 
-// ---------- Frame's instant sync ----------
+// ---------- Rollback's instant sync ----------
 //
 // No waiting on the server. Rules:
 //  - Your press acts on your screen at once, then goes to the others with the exact moment
@@ -1870,7 +1880,7 @@ class DirectFollower extends RoomLink {
     _tick?.cancel();
     _drift?.cancel();
     _hostTimer?.cancel();
-    // Closing the video doesn't leave the party. If this Frame kept time, someone still
+    // Closing the video doesn't leave the party. If this Rollback kept time, someone still
     // watching takes over.
     if (!handingOver && sync.isHost) sync.sendDirect({'t': 'away', 'by': _me});
   }
@@ -1929,7 +1939,7 @@ class DirectFollower extends RoomLink {
       _announce('play');
     } else {
       // Ask the room where it is; whoever keeps time answers with the current state. Nobody
-      // answering in 4 s (everyone else closed the video): this Frame keeps time from here.
+      // answering in 4 s (everyone else closed the video): this Rollback keeps time from here.
       sync.sendDirect({'t': 'hello', 'by': _me}, freshPeers: true);
       _hostTimer = Timer(const Duration(seconds: 4), () async {
         if (_done || _heard) return;
@@ -1985,7 +1995,7 @@ class DirectFollower extends RoomLink {
     switch (m['t']) {
       case 'state':
         _heard = true;
-        // Two Frames opened at the same moment and both started keeping time: the one that
+        // Two Rollbacks opened at the same moment and both started keeping time: the one that
         // took over by itself steps back.
         if (_selfElected && sync.isHost) {
           sync.isHost = false;
@@ -2044,7 +2054,7 @@ class DirectFollower extends RoomLink {
       case 'bye':
         _waitingFor.remove(m['by']?.toString());
         notice('${m['by']} left');
-        // Alone or the host left: this Frame keeps time from now on.
+        // Alone or the host left: this Rollback keeps time from now on.
         if ((sync.group.value?.people.length ?? 1) <= 2) sync.isHost = true;
         if (_waitingFor.isEmpty) _apply();
     }

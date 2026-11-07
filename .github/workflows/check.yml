@@ -1,4 +1,4 @@
-# Checks Frame's code on every upload to main (and every pull request), in about two minutes:
+# Checks Rollback's code on every upload to main (and every pull request), in about two minutes:
 # - flutter analyze: finds code that wouldn't build or is likely wrong (errors and warnings fail
 #   the check; style hints don't)
 # - flutter test: the automated tests in test/ (playback rules, tracks, downloads, item text)

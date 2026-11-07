@@ -5,7 +5,7 @@
 // and nothing changes.
 //
 // What's sent: crashes, uncaught errors, and playback failures, with the device model, iOS or
-// Windows version, Frame's build, and what the player was doing (original or server version,
+// Windows version, Rollback's build, and what the player was doing (original or server version,
 // Dolby Vision or not). Never sent: your server's sign-in token (removed from every address
 // and message below), names of people, or IP addresses.
 

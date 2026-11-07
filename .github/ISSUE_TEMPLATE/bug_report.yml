@@ -1,12 +1,12 @@
 name: Bug report
-description: Something in Frame doesn't work or looks wrong
+description: Something in Rollback doesn't work or looks wrong
 title: "[Bug]: "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for testing Frame! The more of this you fill in, the faster it gets fixed.
+        Thanks for testing Rollback! The more of this you fill in, the faster it gets fixed.
         One problem per report, please. Check the [open issues](https://github.com/Nagilordy/Frame/issues) first in case it's already known.
 
   - type: textarea
@@ -42,7 +42,7 @@ body:
   - type: dropdown
     id: where
     attributes:
-      label: Where in Frame?
+      label: Where in Rollback?
       options:
         - Home
         - Library (Movies, Shows, Anime…)
@@ -52,7 +52,7 @@ body:
         - Watch party
         - Profiles / sign in / switch server
         - On-screen keyboard
-        - Installing / starting Frame
+        - Installing / starting Rollback
         - Somewhere else
     validations:
       required: true
@@ -71,7 +71,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Frame version
+      label: Rollback version
       description: The release you downloaded (e.g. v0.3.1), or "built from source" with the date.
       placeholder: "v0.3.1"
     validations:
@@ -98,7 +98,7 @@ body:
   - type: dropdown
     id: input
     attributes:
-      label: What were you using to control Frame?
+      label: What were you using to control Rollback?
       multiple: true
       options:
         - PlayStation controller (DualSense / DualShock)
@@ -114,14 +114,14 @@ body:
     id: screen
     attributes:
       label: Screen
-      description: Resolution, and whether Frame was full screen.
+      description: Resolution, and whether Rollback was full screen.
       placeholder: "4K TV, full screen / 1440p monitor, window"
 
   - type: input
     id: video
     attributes:
       label: The video (if it's about playback)
-      description: What it was and its quality, as shown in Frame's Info (Triangle in the player).
+      description: What it was and its quality, as shown in Rollback's Info (Triangle in the player).
       placeholder: "The Simpsons S17E19 · 1080p · HEVC · AC3 5.1 · original file"
 
   - type: textarea
@@ -129,7 +129,7 @@ body:
     attributes:
       label: Log
       description: |
-        Very helpful for crashes and playback problems. On Linux, start Frame from a terminal and copy what it prints around the problem.
+        Very helpful for crashes and playback problems. On Linux, start Rollback from a terminal and copy what it prints around the problem.
       render: text
 
   - type: textarea

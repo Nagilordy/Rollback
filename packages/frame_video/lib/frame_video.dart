@@ -1,9 +1,9 @@
-// Frame's video surface (Windows): a borderless window kept exactly under Frame's window, the
+// Rollback's video surface (Windows): a borderless window kept exactly under Rollback's window, the
 // same size, where the video engine (libmpv) draws with its own renderer, so HDR, Dolby Vision
-// and smooth motion work. Frame's window turns see-through while the video plays, so its
+// and smooth motion work. Rollback's window turns see-through while the video plays, so its
 // controls sit on top of the picture: one app, one window.
 //
-// Windows, and Linux when Frame runs in X11 mode (the AppImage switches to it when the preview
+// Windows, and Linux when Rollback runs in X11 mode (the AppImage switches to it when the preview
 // is on; Gaming Mode always is). Elsewhere every call answers null / does nothing.
 // Linux under Wayland has the HDR layer instead (openHdr below).
 
@@ -16,7 +16,7 @@ class FrameVideo {
 
   static bool get supported => Platform.isWindows || Platform.isLinux;
 
-  /// Creates the video surface under Frame's window and makes Frame's window see-through.
+  /// Creates the video surface under Rollback's window and makes Rollback's window see-through.
   /// Returns the surface's window handle (for mpv's "wid"), or null if it couldn't.
   static Future<int?> open() async {
     if (!supported) return null;
@@ -27,7 +27,7 @@ class FrameVideo {
     }
   }
 
-  /// Removes the surface and makes Frame's window solid again.
+  /// Removes the surface and makes Rollback's window solid again.
   static Future<void> close() async {
     if (!supported) return;
     try {
@@ -37,7 +37,7 @@ class FrameVideo {
 
   // ---------- Linux (Wayland): the HDR layer ----------
   //
-  // A Wayland subsurface under Frame's window where the engine draws through libmpv's render
+  // A Wayland subsurface under Rollback's window where the engine draws through libmpv's render
   // API, described to the compositor as HDR10 when the video and the screen are HDR. The
   // player must be created with vo=libmpv and no VideoController (one render context per
   // player), and closeHdr() must run before the player is disposed.

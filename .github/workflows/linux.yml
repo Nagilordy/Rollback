@@ -1,4 +1,4 @@
-# Builds Frame for Linux as one file, Frame-x86_64.AppImage, that runs on most distributions
+# Builds Rollback for Linux as one file, Rollback-x86_64.AppImage, that runs on most distributions
 # (anything at least as new as Ubuntu 24.04 / Fedora 40, which includes Bazzite).
 # Runs when a release tag like v0.3 is created (it attaches the AppImage to that release), or
 # by hand (Actions tab > Linux AppImage > Run workflow). Uploading files to main doesn't start it.
@@ -35,7 +35,7 @@ jobs:
       - name: Linux project files
         run: test -d linux || flutter create --platforms=linux --project-name player_test .
 
-      # Frame's window can be see-through where Frame draws nothing, so the new player's video
+      # Rollback's window can be see-through where Rollback draws nothing, so the new player's video
       # (drawn under the window, packages/frame_video) shows through behind the controls:
       # an RGBA window and a clear Flutter background. Every screen paints its own background,
       # so nothing else changes.
@@ -78,7 +78,7 @@ jobs:
           PY
           grep -n "rgba\|background_color\|frame_clear" linux/runner/my_application.cc || true
 
-      # The new player's engine draws into a window inside Frame from its own threads. Xlib
+      # The new player's engine draws into a window inside Rollback from its own threads. Xlib
       # (X11) then has to be in its thread-safe mode, switched on before anything else uses it,
       # or the app aborts ("[xcb] Unknown sequence number"). Harmless under Wayland.
       - name: Thread-safe X11 (for the new player)
@@ -115,37 +115,37 @@ jobs:
           mkdir -p $APPDIR/usr/bin $APPDIR/usr/share/applications $APPDIR/usr/share/icons/hicolor/512x512/apps
           # The app keeps its own layout next to the program (lib/ and data/ beside it).
           cp -r build/linux/x64/release/bundle/* $APPDIR/usr/bin/
-          cp packaging/frame.desktop $APPDIR/usr/share/applications/frame.desktop
-          cp packaging/frame.png $APPDIR/usr/share/icons/hicolor/512x512/apps/frame.png
+          cp packaging/rollback.desktop $APPDIR/usr/share/applications/rollback.desktop
+          cp packaging/rollback.png $APPDIR/usr/share/icons/hicolor/512x512/apps/rollback.png
 
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -q https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk.sh packaging/AppRun
 
-          # Every library Frame and its video player need, so nothing has to be installed.
+          # Every library Rollback and its video player need, so nothing has to be installed.
           LIBS=""
           for l in $APPDIR/usr/bin/lib/*.so; do LIBS="$LIBS --library $l"; done
           MPVLIB=$(ls /usr/lib/x86_64-linux-gnu/libmpv.so.2* | head -1)
 
           export DEPLOY_GTK_VERSION=3
           export APPIMAGE_EXTRACT_AND_RUN=1
-          OUTPUT=Frame-x86_64.AppImage ./linuxdeploy-x86_64.AppImage \
+          OUTPUT=Rollback-x86_64.AppImage ./linuxdeploy-x86_64.AppImage \
             --appdir $APPDIR \
             --executable $APPDIR/usr/bin/player_test \
             $LIBS --library $MPVLIB \
-            --desktop-file $APPDIR/usr/share/applications/frame.desktop \
-            --icon-file packaging/frame.png \
+            --desktop-file $APPDIR/usr/share/applications/rollback.desktop \
+            --icon-file packaging/rollback.png \
             --custom-apprun packaging/AppRun \
             --plugin gtk \
             --output appimage
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Frame-Linux
-          path: Frame-x86_64.AppImage
+          name: Rollback-Linux
+          path: Rollback-x86_64.AppImage
 
       - name: Attach to the release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: Frame-x86_64.AppImage
+          files: Rollback-x86_64.AppImage

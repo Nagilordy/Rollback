@@ -1,11 +1,15 @@
 # Changelog
 
-What changed in each version of Frame. Newest first.
+What changed in each version of Rollback. Newest first.
 
 ## 0.3 (in testing)
 
 ### New
-- **The player's new design on PC and TV.** Frame's player now has the design from the
+- **Frame is now called Rollback.** New name everywhere: the window, the Windows program
+  (Rollback.exe, RollbackSetup.exe), the Linux AppImage (Rollback-x86_64.AppImage), the iPhone
+  home screen and the name your Jellyfin server shows. Updating keeps your settings, sign-in
+  and downloads, and Watch together still works with copies that are still called Frame.
+- **The player's new design on PC and TV.** Rollback's player now has the design from the
   canvas: a dark bar at the bottom with the timeline (hover it to see the time), the Audio,
   Subtitles, Playback and Info tabs showing what's in use, and −10 / play / +30 in the middle.
   Choosing a tab opens the sheet further, with the choices as big cards, subtitle size,
@@ -16,24 +20,24 @@ What changed in each version of Frame. Newest first.
   fills up as the countdown runs. Starting a video shows the loading screen with the show's
   artwork and logo, where it resumes, and Cancel.
 - **Real HDR on Linux (Wayland).** On a desktop with HDR switched on (KDE Plasma 6, for
-  example), HDR films now play in real HDR10 inside Frame's player, up to your screen's peak
+  example), HDR films now play in real HDR10 inside Rollback's player, up to your screen's peak
   brightness, with the controls on top as before. SDR films and SDR screens get a normal
   picture. Switching HDR on or off in the display settings during a film is followed within a
   second. Info shows it under Your screen (for example "HDR · 800 nits"). Desktops without
-  HDR support keep the player drawn inside Frame's window.
-- **One player: Frame's own** (Windows and Linux). Every video, including Watch together and
-  the server's version, plays in Frame's player, drawn inside Frame's window; no separate mpv
+  HDR support keep the player drawn inside Rollback's window.
+- **One player: Rollback's own** (Windows and Linux). Every video, including Watch together and
+  the server's version, plays in Rollback's player, drawn inside Rollback's window; no separate mpv
   window. HDR films are shown converted to a normal picture for now: real HDR comes later.
-  Frame runs in Linux's normal display mode again. The old mpv window player is gone
+  Rollback runs in Linux's normal display mode again. The old mpv window player is gone
   completely (no emergency switch), and the Windows download no longer includes mpv.exe.
-- **SteamOS Gaming Mode: videos play inside Frame's window.** Gaming Mode shows one window at a
+- **SteamOS Gaming Mode: videos play inside Rollback's window.** Gaming Mode shows one window at a
   time, so the separate player window could leave the video hidden or the controller in the
-  wrong place. In Gaming Mode Frame now uses its in-app player. On Automatic, Dolby Vision 5 files
+  wrong place. In Gaming Mode Rollback now uses its in-app player. On Automatic, Dolby Vision 5 files
   use the server's version there (like on phones). Desktop Mode, Windows and other Linux desktops
   keep the separate player window with real HDR.
-- **Windows: Frame's icon and name everywhere.** The program is now Frame.exe (not
-  player_test.exe), with Frame's name in Task Manager and the window from the first moment.
-  Desktop and Start menu shortcuts use Frame's icon file directly (so an old cached icon can't
+- **Windows: Rollback's icon and name everywhere.** The program is now Rollback.exe (not
+  player_test.exe), with Rollback's name in Task Manager and the window from the first moment.
+  Desktop and Start menu shortcuts use Rollback's icon file directly (so an old cached icon can't
   show).
   Settings and sign-in are kept. Fixes #16.
 - **Show page: All seasons.** Shows with 7 or more seasons get an "All seasons" button at the end
@@ -46,7 +50,7 @@ What changed in each version of Frame. Newest first.
   down. When things happen quickly, the previous notice stays underneath as a small pill.
   Problems (slow connection, can't open the video) are amber, a closed room is red, and
   "Waiting for everyone" has its own card. Party notices on Home use the same look.
-- **SteamOS Gaming Mode (Steam Machine, Steam Deck), first step.** Frame notices when it runs
+- **SteamOS Gaming Mode (Steam Machine, Steam Deck), first step.** Rollback notices when it runs
   inside Gaming Mode: it opens full screen, and the player always opens full screen, drawn so
   Gaming Mode can show it in real HDR on an HDR TV. Desktop Mode and other systems are unchanged.
   Not tested on a Steam device yet (see the SteamOS test issue).
@@ -72,18 +76,18 @@ What changed in each version of Frame. Newest first.
     end of each episode row. An arrow to start, a thin ring while it downloads (tap to pause),
     a tick when it's on the phone. The line next to it adds "· 42%", "· Paused" or "· Downloaded".
   - The original file, in full quality, with its details and artwork. Downloads keep going
-    with Frame closed, pause and resume, retry after a dropped connection, and notify when
+    with Rollback closed, pause and resume, retry after a dropped connection, and notify when
     done. Wi-Fi only by default (a switch on the Downloads screen).
   - Downloads screen (the download button next to your avatar on Home, and on Home's
     "can't reach the server" message): what's downloading, what's on the phone, space used;
     tap to play, swipe left to remove.
   - Downloads play from the phone even when the server is there. Where you stop is saved and
     sent to Jellyfin the next time it answers, so Continue watching stays right.
-- **iPhone: Frame's name and icon** on the home screen, instead of the template's.
+- **iPhone: Rollback's name and icon** on the home screen, instead of the template's.
 - **iPhone: lighter and safer playback.**
   - The picture is drawn at the screen's size instead of the file's: a 4K movie no longer
     makes the phone draw 3840x2160 every frame. Less heat and battery, fewer dropped frames.
-  - Leaving Frame while a video plays (home, another app, locking the phone) pauses it and
+  - Leaving Rollback while a video plays (home, another app, locking the phone) pauses it and
     stops the picture, since iOS stops apps that draw with the GPU in the background. Coming
     back, it's where you left it. In a watch party the video keeps going for the others.
 - **iPhone: the player made for touch (stage 4).** Video still plays sideways.
@@ -122,7 +126,7 @@ What changed in each version of Frame. Newest first.
     away or tap outside to close.
   - Change server: your servers first, the one in use marked Connected, each with how many
     profiles are signed in; swipe one to the left to forget it and its sign-ins. Then what
-    Frame finds on your Wi-Fi.
+    Rollback finds on your Wi-Fi.
   - Add a server: one address field with the phone's own keyboard, checked as you type
     ("Found Home Theater · Jellyfin 10.10"), then Connect.
 - **Watch parties.** A room that stays together between videos.
@@ -149,7 +153,7 @@ What changed in each version of Frame. Newest first.
 - README for the GitHub page.
 
 - **Windows plays in mpv too**, like Linux: real HDR (with Windows HDR on), Dolby Vision and
-  TrueHD. The installer now includes mpv. Without it, Frame falls back to its built-in player.
+  TrueHD. The installer now includes mpv. Without it, Rollback falls back to its built-in player.
 
 ### Improved
 - **New profile menu (Triangle on Home):** a PS5-style control center that slides up from the
@@ -176,7 +180,7 @@ What changed in each version of Frame. Newest first.
   - Typing no longer shrinks and rescales the whole screen when the keyboard opens; the screen
     just slides up enough to keep the field you're typing in above the keyboard.
   - Videos: like on a PC, the original file plays straight from the NAS whenever it can (MKV,
-    HEVC, HDR, TrueHD, DTS, every kind of subtitle), with no conversion on the server. Frame
+    HEVC, HDR, TrueHD, DTS, every kind of subtitle), with no conversion on the server. Rollback
     switches to the server's version by itself only if the original shows no picture within a
     few seconds or stutters. Dolby Vision Profile 5 always uses the server's version on a phone
     (it would otherwise show pink and green).
@@ -209,10 +213,10 @@ What changed in each version of Frame. Newest first.
   when it ends and its summary. Right: video, audio, subtitles, how it's playing (original file
   or converted), decoder, buffered and dropped frames, and your screen. Replaces the small box.
 - **Log fix:** "mpv: closed while starting" no longer appears every time you quit the player
-  normally; it now only shows when mpv really closed before Frame could connect.
+  normally; it now only shows when mpv really closed before Rollback could connect.
 - **New loading screen, like starting a game on PS5:** the show's artwork full screen, the logo
   bottom left where Home shows it, the episode line, chips for the quality (4K, HDR, 5.1...), a
-  running line and "Resumes at 14:55" / "Starting". Frame and the player show the same screen,
+  running line and "Resumes at 14:55" / "Starting". Rollback and the player show the same screen,
   and when the video is ready it dips to black and opens on the video.
 - **Up next card in the new style:** a rounded card at the bottom right with the next episode's
   picture, title, season / episode and length. The white Play now pill fills up during the
@@ -235,16 +239,16 @@ What changed in each version of Frame. Newest first.
 - **New app icon** on Linux (AppImage) and Windows (taskbar, Start menu, installer).
 - **Continue watching shows your next episode.** Finish an episode and the next one waits at
   the front of the row, mixed with what you stopped part-way, newest first.
-- **Faster launch:** Frame no longer waits to check its video player before opening its window.
+- **Faster launch:** Rollback no longer waits to check its video player before opening its window.
 - **The selection stays on the same title** when Home refreshes a second after opening (or
   after a video), instead of landing on whatever moved into that spot.
 - **A sleeping server doesn't greet you with an error:** Home says "Connecting to …" and
   keeps trying for about 20 seconds first.
-- **Starting a video stays inside Frame.** Pressing Play turns the page into a loading screen:
+- **Starting a video stays inside Rollback.** Pressing Play turns the page into a loading screen:
   the artwork dims away and the title logo settles in the centre. The player opens on exactly
-  the same screen, logo included, then fades into the video. In full screen, Frame no longer
+  the same screen, logo included, then fades into the video. In full screen, Rollback no longer
   minimizes behind the player, so leaving a video returns straight to the page with no
-  animation. (In a window, Frame still steps aside as before.)
+  animation. (In a window, Rollback still steps aside as before.)
 - **Back during a video takes two presses:** the first brings the controls back, the second
   leaves. One stray press no longer ends the video.
 - **Controller legend in the player** no longer disappears on some videos, or when a resting
@@ -252,7 +256,7 @@ What changed in each version of Frame. Newest first.
 - **Smoother motion** for 25 and 23.976 fps videos on a 60 Hz screen. The player times playback
   to the screen and blends the odd frame, instead of alternating 2 and 3 refreshes.
 - **Performance log:** each line now records the window size and full-screen state, and nothing
-  is recorded while Frame is hidden behind a video.
+  is recorded while Rollback is hidden behind a video.
 - **Watch together log:** instant mode now records what it sends and receives.
 
 ### Fixed
@@ -260,10 +264,10 @@ What changed in each version of Frame. Newest first.
   on Linux and Windows. Before, only subtitles inside the video file were offered.
 - **Disc images and disc folders** (ISO, Blu-ray BDMV, DVD VIDEO_TS) play: they use the
   server's version automatically, since they can't be streamed as one file.
-- **Server off when you press Play:** Frame says "Can't reach your Jellyfin server" within a
+- **Server off when you press Play:** Rollback says "Can't reach your Jellyfin server" within a
   few seconds, with Retry and Back, instead of loading for half a minute and blaming the video.
 - **A video that won't open is retried with the server's version** from the same moment,
-  instead of ending on an error. If that fails too, Frame says so.
+  instead of ending on an error. If that fails too, Rollback says so.
 - **Resume is exact:** a video picks up exactly where you stopped, not a few seconds earlier
   at the previous keyframe. Skipping stays as quick as before.
 - **Interlaced videos** (TV recordings, DVDs) are deinterlaced: no more combing on movement.
@@ -271,12 +275,12 @@ What changed in each version of Frame. Newest first.
 - **Playback info (Triangle) shows in the Windows player** again. The box failed to draw.
 - Going from one video to the next no longer turns off full screen control in the new player.
 - **The player shows PlayStation buttons with a PlayStation controller.** Its legend always
-  drew Xbox letters (A, B, LB, RB), even when Frame's own screens showed PlayStation symbols.
-- **"mpv closed while starting" on Linux is gone.** Frame now runs its mpv from an unpacked copy,
+  drew Xbox letters (A, B, LB, RB), even when Rollback's own screens showed PlayStation symbols.
+- **"mpv closed while starting" on Linux is gone.** Rollback now runs its mpv from an unpacked copy,
   so a video cut short can no longer leave mpv unable to start (and videos open a bit faster).
 - **Controller legend comes back in the player** when you pick the controller up again after
   using the mouse or keyboard.
-- **Frame no longer drops out of full screen** when you leave a video.
+- **Rollback no longer drops out of full screen** when you leave a video.
 - **No more crash message** when the controller is touched just as the player closes.
 
 ## 0.2
@@ -284,7 +288,7 @@ What changed in each version of Frame. Newest first.
 ### New
 - **L2 / R2 switch tabs:** libraries from Home, and seasons on a show page.
 - **Windows player remembers audio and subtitle choices** per show, like the Linux player.
-- **Performance log:** `perf-<date>.log` in Frame's log folder.
+- **Performance log:** `perf-<date>.log` in Rollback's log folder.
 - **Watch together log:** `together-<date>.log`, to compare with the server's log.
 
 ### Fixed

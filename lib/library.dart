@@ -848,7 +848,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       if (upright) ...[
         Padding(
           padding: EdgeInsets.only(left: m.left, right: m.right),
-          child: Row(children: [Text('Frame', style: phoneTitle(22)), const Spacer(), avatar]),
+          child: Row(children: [Text('Rollback', style: phoneTitle(22)), const Spacer(), avatar]),
         ),
         const SizedBox(height: 14),
         tabs,
