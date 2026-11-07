@@ -26,6 +26,8 @@ UninstallDisplayName=Rollback
 ; Rollback's icon on the installer itself and in Windows' list of installed apps.
 SetupIconFile=..\packaging\app_icon.ico
 UninstallDisplayIcon={app}\Rollback.ico
+; Rollback's licence, shown before installing (accepting it is part of installing).
+LicenseFile=..\LICENSE
 
 [Tasks]
 Name: "desktopicon"; Description: "Add a desktop icon"; GroupDescription: "Shortcuts:"
@@ -35,6 +37,12 @@ Name: "desktopicon"; Description: "Add a desktop icon"; GroupDescription: "Short
 Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Rollback's icon, for the shortcuts and the list of installed apps.
 Source: "..\packaging\app_icon.ico"; DestDir: "{app}"; DestName: "Rollback.ico"; Flags: ignoreversion
+; Rollback's licence, the third-party notices and the licence texts of the LGPL video
+; libraries (libmpv-2.dll: LGPL 3, which is built on the GPL 3 text).
+Source: "..\LICENSE"; DestDir: "{app}\licenses"; DestName: "LICENSE.txt"; Flags: ignoreversion
+Source: "..\THIRD_PARTY_NOTICES.md"; DestDir: "{app}\licenses"; DestName: "THIRD_PARTY_NOTICES.txt"; Flags: ignoreversion
+Source: "..\packaging\licenses\LGPL-3.0.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
+Source: "..\packaging\licenses\GPL-3.0.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
 
 [InstallDelete]
 ; Older versions installed the program as player_test.exe: remove it so only Rollback.exe is left.

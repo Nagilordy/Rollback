@@ -66,6 +66,22 @@ jobs:
         run: |
           if (-not (Test-Path build\windows\x64\runner\Release\Rollback.exe)) { throw "Rollback.exe missing: the rename didn't apply" }
 
+      # Everything that ships, listed in the log, and a stop if a GPL-only or unexpected kind
+      # of library got in (see THIRD_PARTY_NOTICES.md for what each file is).
+      - name: What ships (licence check)
+        shell: pwsh
+        run: |
+          $rel = 'build\windows\x64\runner\Release'
+          Get-ChildItem $rel -Recurse -File | Sort-Object FullName | ForEach-Object {
+            '{0,12:N0}  {1}' -f $_.Length, $_.FullName.Substring((Resolve-Path $rel).Path.Length + 1)
+          }
+          $bad = Get-ChildItem $rel -Recurse -File | Where-Object { $_.Name -match '(x264|x265|xvid|postproc|rubberband|fftw|jvm)' }
+          if ($bad) { throw "Must not ship: $($bad.Name -join ', ')" }
+          # libmpv-2.dll must be the LGPL build (FFmpeg built with --disable-gpl).
+          $mpv = [IO.File]::ReadAllText("$rel\libmpv-2.dll", [Text.Encoding]::ASCII)
+          if ($mpv -notmatch '--disable-gpl' -or $mpv -match 'license: GPL') { throw 'libmpv-2.dll is not the LGPL build' }
+          'libmpv-2.dll: LGPL build (FFmpeg --disable-gpl)'
+
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
 
