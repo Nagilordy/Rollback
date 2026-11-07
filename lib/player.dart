@@ -356,7 +356,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         // The server already fixed the colours: no conversion on this device.
         await mpv.setProperty('vf', '');
         _dvFilterHdr = null;
-        await mpv.setProperty('hwdec', 'auto-safe');
+        await mpv.setProperty('hwdec', _hwdec);
       } else if (_isDolbyVisionOnly && (!_surface || _hdrLayer)) {
         // (Through the video surface, gpu-next applies Dolby Vision's colours itself; the HDR
         // layer's renderer doesn't, so it gets the filter too.)
@@ -485,7 +485,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     final mpv = player.platform;
     if (mpv is! NativePlayer) return;
     final hdr = _layer?.hdr == true;
-    await mpv.setProperty('hwdec', 'auto-copy-safe');
+    await mpv.setProperty('hwdec', _hwdecCopy);
     await mpv.setProperty('vf', 'lavfi=[${hdr ? _dvConvertHdr : _dvConvert}]');
     _dvFilterHdr = hdr;
     if (_layer != null) _dvWatch ??= Timer.periodic(const Duration(seconds: 1), (_) => _followLayerForDv());
@@ -1178,11 +1178,18 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     );
   }
 
+  // GPU decoding: VA-API first (Intel/AMD on Linux, decoded straight into the picture), then
+  // whatever else the hardware has. The video libraries can also decode through Vulkan, which
+  // mpv would otherwise try first; through Rollback's OpenGL drawing that copies every frame
+  // back through memory.
+  static const _hwdec = 'vaapi,nvdec,d3d11va,auto-safe';
+  static const _hwdecCopy = 'vaapi-copy,nvdec-copy,d3d11va-copy,auto-copy-safe';
+
   Future<void> _start() async {
     final mpv = player.platform;
     if (mpv is NativePlayer) {
       // Decode on the GPU when the hardware supports the codec, otherwise fall back safely.
-      await mpv.setProperty('hwdec', 'auto-safe');
+      await mpv.setProperty('hwdec', _hwdec);
       // Dolby Vision Profile 5 (Disney+ and similar) has no normal HDR picture inside, only
       // Dolby's own colour format, so shown as-is it comes out pink and green. mpv only
       // converts it with its newer drawing engine, which the embedded player can't use yet.
@@ -1747,6 +1754,19 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                     ),
                   ),
                 ),
+              ),
+
+            // See-through window over the video (HDR layer / video surface): once the controls
+            // have faded out, nothing else is painted. A frame with nothing in it doesn't replace
+            // the one before, so the screen kept the fade's last frame: the controls stayed faintly
+            // printed over the video. One practically invisible pixel keeps every frame non-empty.
+            if (_surface)
+              const Positioned(
+                left: 0,
+                top: 0,
+                width: 1,
+                height: 1,
+                child: IgnorePointer(child: ColoredBox(color: Color(0x01000000))),
               ),
 
             // Loading spinner while the video starts or buffers.
