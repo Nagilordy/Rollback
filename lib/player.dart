@@ -211,7 +211,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   int? _serverTextSub; // a text subtitle shown on this device, or null
   final Map<int, String> _serverSubUrls = {};
 
-  String get _levelKey => _isDolbyVisionOnly ? 'playbackStepDolbyVision' : 'playbackStep';
+  // The HDR layer (Linux, Wayland) draws differently from the in-window player, so it learns
+  // its own step: drops seen with the in-window player don't send it to the server.
+  String get _levelKey =>
+      (_isDolbyVisionOnly ? 'playbackStepDolbyVision' : 'playbackStep') + (_hdrLayer ? 'Layer' : '');
   int get _serverStep => serverStepFor(widget.item);
   int get _maxLevel => _mode == 'original' ? _serverStep - 1 : _serverStep;
 
