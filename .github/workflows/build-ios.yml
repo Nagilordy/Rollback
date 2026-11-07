@@ -14,6 +14,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.47.8  # the version Rollback is tested with
 
       # The video plugin (media_kit_video, from the community fork in pubspec.yaml) only finds
       # its iPhone video libraries through CocoaPods. With Flutter's newer Swift Package Manager
