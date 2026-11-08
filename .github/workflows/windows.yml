@@ -76,7 +76,7 @@ jobs:
           msystem: UCRT64
           update: true
           install: >-
-            make tar xz curl
+            make tar xz curl diffutils
           pacboy: >-
             toolchain:p meson:p ninja:p nasm:p pkgconf:p
             libass:p libplacebo:p dav1d:p shaderc:p spirv-cross:p

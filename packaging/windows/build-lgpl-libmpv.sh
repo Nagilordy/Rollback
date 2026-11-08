@@ -9,7 +9,7 @@
 #   packaging/windows/build-lgpl-libmpv.sh <work dir>   -> <work dir>/out/libmpv-2.dll + the DLLs
 #                                                          it needs + licenses/
 #
-# MSYS2 packages (pacboy names): toolchain meson ninja nasm pkgconf libass libplacebo dav1d
+# MSYS2 packages: diffutils, and (pacboy names) toolchain meson ninja nasm pkgconf libass libplacebo dav1d
 # shaderc spirv-cross vulkan-headers vulkan-loader lcms2 libjpeg-turbo zimg uchardet opus
 # libvpx libxml2 zlib ffnvcodec-headers
 set -euo pipefail
@@ -52,7 +52,7 @@ cd "$WORK/build/ffmpeg"
 grep -q 'FFMPEG_LICENSE "LGPL' config.h || { echo "FFmpeg is not LGPL: $(grep FFMPEG_LICENSE config.h)"; exit 1; }
 # The whole point of this engine: these must be in.
 for d in TRUEHD MLP PGSSUB EAC3 AC3 DCA; do
-  grep -q "#define CONFIG_${d}_DECODER 1" config.h || { echo "FFmpeg has no $d decoder"; exit 1; }
+  grep -q "#define CONFIG_${d}_DECODER 1" config_components.h || { echo "FFmpeg has no $d decoder"; exit 1; }
 done
 make -j"$JOBS"
 make install
