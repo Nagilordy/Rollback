@@ -37,10 +37,11 @@ https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 ## Libraries next to the engine on Windows
 
 On Windows, the engine's own dependencies ship next to `libmpv-2.dll`, from MSYS2's UCRT64
-packages: libass, libplacebo, dav1d, shaderc, SPIRV-Cross, FreeType, HarfBuzz, FriBidi,
-Little CMS, libjpeg-turbo, zimg, uchardet, Opus, libvpx, libxml2, zlib, the Vulkan loader and
-the GCC runtime (libgcc, libstdc++, libwinpthread, under the GCC Runtime Library Exception).
-They are under LGPL, MIT, BSD, ISC, Apache 2.0, MPL, zlib and similar licences.
+packages: libass, libplacebo, libdovi, dav1d, shaderc, SPIRV-Cross, FreeType, HarfBuzz,
+Graphite2, FriBidi, libunibreak, Fontconfig, Expat, Little CMS, libjpeg-turbo, libpng, zimg,
+uchardet, Opus, libvpx, libxml2, libiconv, gettext's libintl, PCRE2, Brotli, bzip2, XZ (liblzma),
+zlib and the GCC runtime (libgcc, libstdc++, libwinpthread, under the GCC Runtime Library
+Exception). They are under LGPL, MIT, BSD, ISC, Apache 2.0, MPL, zlib and similar licences.
 
 ## Libraries in the Linux AppImage
 
