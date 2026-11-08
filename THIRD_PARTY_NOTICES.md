@@ -12,26 +12,35 @@ Both are built as LGPL-only, with no GPL or non-free parts:
 - FFmpeg: configured without `--enable-gpl` and without `--enable-nonfree`.
 - mpv: built with `-Dgpl=false`.
 
-On Linux, the exact build is `packaging/linux/build-lgpl-libmpv.sh`. On Windows, Rollback
-uses the LGPL libmpv build that media_kit publishes
-(https://github.com/media-kit/libmpv-win32-video-build).
+The exact builds are `packaging/linux/build-lgpl-libmpv.sh` (Linux) and
+`packaging/windows/build-lgpl-libmpv.sh` (Windows, built with MSYS2's UCRT64 toolchain).
 
 These libraries are linked dynamically and ship as separate files, so you can replace them
 with your own build:
 
 - Linux: extract the AppImage (`./Rollback-x86_64.AppImage --appimage-extract`) and replace
   the files in `squashfs-root/usr/lib/`.
-- Windows: replace `libmpv-2.dll` in Rollback's install folder.
+- Windows: replace `libmpv-2.dll` and the FFmpeg DLLs (`avcodec-61.dll` and the others) in
+  Rollback's install folder.
 
-**Source code.** Every Rollback release has the exact source code of the Linux build's
-libraries attached next to the download (`ffmpeg-7.1.1.tar.xz`, `mpv-0.39.0.tar.gz`). The
-Windows build's sources and build scripts are published by media_kit at the link above. The same releases come from
+**Source code.** Every Rollback release has the exact source code of these libraries attached
+next to the download (`ffmpeg-7.1.1.tar.xz`, `mpv-0.39.0.tar.gz`); Linux and Windows use the
+same sources. The same releases come from
 https://ffmpeg.org/releases/ and https://github.com/mpv-player/mpv/releases. Rollback makes no
 changes to them. For three years after a release you can also ask for that source code through
 the place you got Rollback; it's provided at no more than the cost of sending it.
 
-Their licence texts are in the AppImage at `usr/share/doc/rollback-lgpl/`, and at
+Their licence texts are in the AppImage at `usr/share/doc/rollback-lgpl/`, in the `licenses`
+folder of Rollback's Windows install folder, and at
 https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+
+## Libraries next to the engine on Windows
+
+On Windows, the engine's own dependencies ship next to `libmpv-2.dll`, from MSYS2's UCRT64
+packages: libass, libplacebo, dav1d, shaderc, SPIRV-Cross, FreeType, HarfBuzz, FriBidi,
+Little CMS, libjpeg-turbo, zimg, uchardet, Opus, libvpx, libxml2, zlib, the Vulkan loader and
+the GCC runtime (libgcc, libstdc++, libwinpthread, under the GCC Runtime Library Exception).
+They are under LGPL, MIT, BSD, ISC, Apache 2.0, MPL, zlib and similar licences.
 
 ## Libraries in the Linux AppImage
 

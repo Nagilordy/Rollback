@@ -82,4 +82,50 @@ void main() {
       expect(server(movie(container: 'iso'), downloaded: true), isFalse);
     });
   });
+
+  group('What the engine can play', () {
+    const full = {'truehd', 'mlp', 'ac3', 'eac3', 'dca', 'aac'};
+    const mediaKitWindows = {'ac3', 'eac3', 'dca', 'aac', 'flac'};
+    Map<String, dynamic> audio(int index, String codec, {String lang = 'eng', int channels = 6, String title = ''}) =>
+        {'Type': 'Audio', 'Index': index, 'Codec': codec, 'Language': lang, 'Channels': channels, 'Title': title};
+
+    test('TrueHD needs the truehd decoder', () {
+      expect(engineCanPlay(audio(1, 'truehd'), full), isTrue);
+      expect(engineCanPlay(audio(1, 'truehd'), mediaKitWindows), isFalse);
+    });
+    test('Blu-ray subtitles follow TrueHD (mpv does not list subtitle decoders)', () {
+      final pgs = {'Type': 'Subtitle', 'Codec': 'PGSSUB'};
+      expect(engineCanPlay(pgs, full), isTrue);
+      expect(engineCanPlay(pgs, mediaKitWindows), isFalse);
+      expect(engineCanPlay({'Type': 'Subtitle', 'Codec': 'subrip'}, mediaKitWindows), isTrue);
+    });
+    test('unknown decoder list: everything is assumed playable', () {
+      expect(engineCanPlay(audio(1, 'truehd'), const {}), isTrue);
+      expect(engineCanPlay({'Codec': 'pgssub'}, const {}), isTrue);
+    });
+    test('codecs every build has are never checked', () {
+      expect(engineCanPlay(audio(1, 'ac3'), mediaKitWindows), isTrue);
+      expect(engineCanPlay(audio(1, 'dts'), const {'aac'}), isTrue);
+    });
+    test('the same language\'s other track replaces TrueHD, most channels first', () {
+      final streams = [
+        audio(1, 'truehd', channels: 8),
+        audio(2, 'ac3', channels: 2),
+        audio(3, 'eac3', channels: 6),
+        audio(4, 'ac3', lang: 'fre', channels: 6),
+      ];
+      expect(playableAudioInstead(streams, streams[0], mediaKitWindows)?['Index'], 3);
+    });
+    test('a commentary never replaces the main track', () {
+      final streams = [
+        audio(1, 'truehd'),
+        audio(2, 'ac3', channels: 2, title: "Director's commentary"),
+      ];
+      expect(playableAudioInstead(streams, streams[0], mediaKitWindows), isNull);
+    });
+    test('no other track in that language: none', () {
+      final streams = [audio(1, 'truehd'), audio(2, 'ac3', lang: 'jpn')];
+      expect(playableAudioInstead(streams, streams[0], mediaKitWindows), isNull);
+    });
+  });
 }

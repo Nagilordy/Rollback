@@ -1,0 +1,2 @@
+# Shell scripts keep Unix line endings, also when checked out on Windows (the MSYS2 engine build).
+*.sh text eol=lf

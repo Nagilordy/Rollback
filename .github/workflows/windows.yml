@@ -57,6 +57,37 @@ jobs:
           Select-String -Path $rc -Pattern 'FileDescription|OriginalFilename'
           Select-String -Path $main -Pattern 'window.Create'
 
+      # Rollback's own LGPL video engine (libmpv + FFmpeg, packaging/windows/build-lgpl-libmpv.sh),
+      # instead of media_kit's, which leaves out Dolby TrueHD and Blu-ray (PGS) subtitles.
+      # Built once and cached until the script changes.
+      - name: Engine cache
+        id: engine
+        uses: actions/cache@v4
+        with:
+          path: |
+            lgpl-win/out
+            lgpl-win/src/*.tar.*
+          key: lgpl-libmpv-windows-${{ hashFiles('packaging/windows/build-lgpl-libmpv.sh') }}
+
+      - name: MSYS2 (to build the engine)
+        if: steps.engine.outputs.cache-hit != 'true'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            make tar xz curl
+          pacboy: >-
+            toolchain:p meson:p ninja:p nasm:p pkgconf:p
+            libass:p libplacebo:p dav1d:p shaderc:p spirv-cross:p
+            vulkan-headers:p vulkan-loader:p lcms2:p libjpeg-turbo:p zimg:p uchardet:p
+            opus:p libvpx:p libxml2:p zlib:p ffnvcodec-headers:p
+
+      - name: Build the engine
+        if: steps.engine.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: packaging/windows/build-lgpl-libmpv.sh lgpl-win
+
       - name: Build
         # SENTRY_DSN (a repository secret) turns on crash reports; empty = off.
         run: flutter build windows --release --dart-define=FRAME_BUILD=${{ github.sha }} --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN }}
@@ -65,6 +96,16 @@ jobs:
         shell: pwsh
         run: |
           if (-not (Test-Path build\windows\x64\runner\Release\Rollback.exe)) { throw "Rollback.exe missing: the rename didn't apply" }
+
+      # media_kit's libmpv-2.dll out, Rollback's engine in (with the DLLs it needs and its licences).
+      - name: Use Rollback's engine
+        shell: pwsh
+        run: |
+          $rel = 'build\windows\x64\runner\Release'
+          if (-not (Test-Path "$rel\libmpv-2.dll")) { throw "No libmpv-2.dll in the build: nothing to replace" }
+          if (-not (Test-Path 'lgpl-win\out\libmpv-2.dll')) { throw "Rollback's engine is missing" }
+          Copy-Item lgpl-win\out\* $rel -Recurse -Force
+          Get-ChildItem $rel -Filter *.dll | Select-Object Name, Length
 
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
