@@ -153,10 +153,21 @@ jobs:
           name: Rollback-Linux
           path: Rollback-x86_64.AppImage
 
+      # The release notes: this version's section of CHANGELOG.md.
+      - name: Release notes (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          awk '/^## /{n++} n==1' CHANGELOG.md > release-notes.md
+          cat release-notes.md
+
       - name: Attach to the release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          name: Rollback ${{ github.ref_name }}
+          body_path: release-notes.md
+          # 0.x versions are test builds: marked Pre-release on GitHub.
+          prerelease: ${{ startsWith(github.ref_name, 'v0.') }}
           # The LGPL libraries' exact source goes with every release (see THIRD_PARTY_NOTICES.md).
           files: |
             Rollback-x86_64.AppImage

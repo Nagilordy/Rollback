@@ -21,8 +21,8 @@ the couch again.
 ![Rollback's Home screen: full-screen artwork, the show's logo, Resume and Watch together, Continue watching below](docs/screenshots/home.jpg)
 
 > **Status:** Rollback has started over at **0.1** with its new name (it was called Frame).
-> 0.1 is in testing on **Linux** first; Windows and SteamOS follow. There's no release to
-> download yet: the first 0.1 build will appear on the [Releases](../../releases) page. Found
+> **0.1 is out as a pre-release for Linux**: get it from the [Releases](../../releases) page.
+> Windows and SteamOS follow. Found
 > something? [Report a bug](../../issues/new?template=bug_report.yml) or
 > [suggest an idea](../../issues/new?template=feature_request.yml).
 
@@ -80,8 +80,8 @@ the couch again.
 
 ## Download
 
-No release yet: the first **0.1** build for **Linux** will appear on the [Releases](../../releases)
-page as `Rollback-x86_64.AppImage`. Make it executable (right-click > Properties > allow running
+Get **0.1** for **Linux** from the [Releases](../../releases) page: `Rollback-x86_64.AppImage`
+(a pre-release, so a test build). Make it executable (right-click > Properties > allow running
 as a program), then open it. Nothing else to install. Windows (`RollbackSetup.exe`) and SteamOS
 come after Linux.
 

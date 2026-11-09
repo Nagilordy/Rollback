@@ -5,7 +5,7 @@ What changed in each version of Rollback. Newest first.
 Rollback started over at 0.1 with its new name (it was called Frame). The earlier test versions,
 0.2 and 0.3, were previews and are no longer listed here.
 
-## 0.1 (in testing)
+## 0.1 (pre-release, Linux)
 
 The first version of Rollback: a couch-first app for Jellyfin, made for a controller and just as
 good with a mouse and keyboard. Testing starts on **Linux**; Windows and SteamOS follow.
@@ -14,7 +14,7 @@ good with a mouse and keyboard. Testing starts on **Linux**; Windows and SteamOS
 - **Sign in your way:** Rollback finds your Jellyfin server on the network (or type its address),
   then sign in with your password or a Quick Connect code from your phone. Profiles stay signed
   in, and Switch profile is one press away.
-- **Home** with the show's artwork full screen, its logo, Resume and Watch together, then
+- **Home** with the show's artwork full screen, its logo and Resume, then
   Continue watching and Recently added.
 - **Libraries** with big posters, watched ticks and progress, and Sort & filter.
 - **Show pages** that open on the next episode, with season pills (L2 / R2) and, for long-running
@@ -44,7 +44,8 @@ good with a mouse and keyboard. Testing starts on **Linux**; Windows and SteamOS
 - **A loading screen** with the show's artwork and logo while the video starts.
 
 ### Watch together
-- Start a party from any show or movie; friends join from their own Rollback or Jellyfin app.
+- Start a party from the profile menu, then Play starts any show or movie for everyone;
+  friends join from their own Rollback or Jellyfin app.
   Play, pause and jumps stay in sync, with notices like "Maya paused" and each person's initial
   in their colour.
 

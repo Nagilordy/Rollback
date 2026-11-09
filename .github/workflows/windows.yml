@@ -139,8 +139,11 @@ jobs:
           name: RollbackSetup
           path: installer\Output\RollbackSetup.exe
 
+      # Windows joins the releases once it has been tested: until then the installer stays a
+      # build download only. To attach it, set the repository variable RELEASE_WINDOWS to true
+      # (Settings > Secrets and variables > Actions > Variables).
       - name: Attach to the release (tags only)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_WINDOWS == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: installer/Output/RollbackSetup.exe

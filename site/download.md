@@ -1,11 +1,11 @@
 # Download
 
-Rollback is free. Get the latest version from the [Releases page on GitHub](https://github.com/Nagilordy/Rollback/releases).
+Rollback is free. Get the latest version from the [Releases page on GitHub](https://github.com/Nagilordy/Rollback/releases). Version 0.1 is a pre-release for **Linux**; Windows and SteamOS come next.
 
 | System | File | How to install |
 |---|---|---|
-| **Windows 10 / 11** | `RollbackSetup.exe` | Run it. Updates install over the old version, and your settings stay. |
 | **Linux** | `Rollback-x86_64.AppImage` | Make it executable (right-click → Properties → allow running as a program), then open it. |
+| **Windows 10 / 11** | `RollbackSetup.exe` (coming soon) | Run it. Updates install over the old version, and your settings stay. |
 
 Nothing else to install.
 
