@@ -3,41 +3,45 @@
 Rollback itself is not open source (see LICENSE). It uses the open-source software below,
 which stays under its own licence.
 
-## Video playback: libmpv and FFmpeg (LGPL)
+## Video playback: libmpv and FFmpeg (LGPL 2.1 or later)
 
-Rollback plays video with **libmpv** and the **FFmpeg** libraries (libavcodec, libavformat,
-libavutil, libavfilter, libavdevice, libswresample, libswscale). In every Rollback build they
-are LGPL-only, with no GPL or non-free parts: FFmpeg is configured without `--enable-gpl` and
-without `--enable-nonfree`, and mpv is built with `-Dgpl=false`.
+Rollback plays video with **libmpv** (mpv 0.39.0) and the **FFmpeg** 7.1.1 libraries
+(libavcodec, libavformat, libavutil, libavfilter, libavdevice, libswresample, libswscale). In
+every Rollback build they are LGPL-only, with no GPL or non-free parts: FFmpeg is configured
+without `--enable-gpl` and without `--enable-nonfree`, and mpv is built with `-Dgpl=false`.
 
-- **Linux:** mpv 0.39.0 and FFmpeg 7.1.1, LGPL 2.1 or later, built by
-  `packaging/linux/build-lgpl-libmpv.sh`. Separate files in the AppImage's `usr/lib/`.
-- **Windows:** `libmpv-2.dll` (mpv and FFmpeg in one file), the LGPL build media_kit publishes
-  (release 2023-09-24, mpv git 652a1dd: https://github.com/media-kit/libmpv-win32-video-build).
-  FFmpeg there is configured with `--enable-version3`, so this file is under the LGPL 3 or later.
+- **Linux:** built by `packaging/linux/build-lgpl-libmpv.sh`. Separate files in the AppImage's
+  `usr/lib/`.
+- **Windows:** built by `packaging/windows/build-lgpl-libmpv.sh` with MSYS2's UCRT64 toolchain:
+  `libmpv-2.dll` and the FFmpeg DLLs (`avcodec-61.dll` and the others) next to it.
 
-They are linked dynamically and ship as separate files, so you can replace them with your own
-build:
+These libraries are linked dynamically and ship as separate files, so you can replace them
+with your own build:
 
 - Linux: extract the AppImage (`./Rollback-x86_64.AppImage --appimage-extract`) and replace
   the files in `squashfs-root/usr/lib/`.
-- Windows: replace `libmpv-2.dll` in Rollback's install folder.
+- Windows: replace `libmpv-2.dll` and the FFmpeg DLLs (`avcodec-61.dll` and the others) in
+  Rollback's install folder.
 
-**Source code.** Rollback makes no changes to these libraries.
+**Source code.** Every Rollback release has the exact source code of these libraries attached
+next to the download (`ffmpeg-7.1.1.tar.xz`, `mpv-0.39.0.tar.gz`); Linux and Windows use the
+same sources. The same releases come from
+https://ffmpeg.org/releases/ and https://github.com/mpv-player/mpv/releases. Rollback makes no
+changes to them. For three years after a release you can also ask for that source code through
+the place you got Rollback; it's provided at no more than the cost of sending it.
 
-- Linux: every Rollback release has the exact source attached next to the download
-  (`ffmpeg-7.1.1.tar.xz`, `mpv-0.39.0.tar.gz`); the same releases are on https://ffmpeg.org/releases/
-  and https://github.com/mpv-player/mpv/releases.
-- Windows: the source and build scripts for `libmpv-2.dll` are published by media_kit at the
-  link above.
+Their licence texts are in the AppImage at `usr/share/doc/rollback-lgpl/`, in the `licenses`
+folder of Rollback's Windows install folder, and at
+https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 
-For three years after a release you can also ask for the complete source code of these
-libraries, for either platform, through the place you got Rollback; it's provided at no more
-than the cost of sending it.
+## Libraries next to the engine on Windows
 
-**Licence texts.** Linux: in the AppImage at `usr/share/doc/rollback-lgpl/`. Windows: in the
-`licenses` folder of Rollback's install folder (LGPL 3 and the GPL 3 it builds on). Also at
-https://www.gnu.org/licenses/.
+On Windows, the engine's own dependencies ship next to `libmpv-2.dll`, from MSYS2's UCRT64
+packages: libass, libplacebo, libdovi, dav1d, shaderc, SPIRV-Cross, FreeType, HarfBuzz,
+Graphite2, FriBidi, libunibreak, Fontconfig, Expat, Little CMS, libjpeg-turbo, libpng, zimg,
+uchardet, Opus, libvpx, libxml2, libiconv, gettext's libintl, PCRE2, Brotli, bzip2, XZ (liblzma),
+zlib and the GCC runtime (libgcc, libstdc++, libwinpthread, under the GCC Runtime Library
+Exception). They are under LGPL, MIT, BSD, ISC, Apache 2.0, MPL, zlib and similar licences.
 
 ## Windows: graphics libraries
 

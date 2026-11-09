@@ -48,3 +48,68 @@ bool startWithServer({
   if (phone && isDolbyVisionOnly(item)) return true;
   return false;
 }
+
+// ----- What this copy's video engine can play -----
+//
+// Some builds of the video engine leave codecs out to stay small. media_kit's Windows engine
+// (the one Rollback ships on Windows) has no Dolby TrueHD decoder and no Blu-ray (PGS)
+// subtitle decoder: the audio plays silent and the subtitles stay blank. Rollback's own LGPL
+// engines (Linux, and Windows once it ships its own) have both.
+
+/// The engine decoder a Jellyfin codec needs, for the codecs some builds leave out.
+/// null: a codec every build has, nothing to check.
+String? engineDecoderFor(String? codec) {
+  switch ((codec ?? '').toLowerCase()) {
+    case 'truehd':
+      return 'truehd';
+    case 'mlp':
+      return 'mlp';
+    case 'pgssub':
+    case 'pgs':
+    case 'hdmv_pgs_subtitle':
+      return 'pgssub';
+  }
+  return null;
+}
+
+/// Whether the engine can play [stream] (one of Jellyfin's audio or subtitle streams).
+///
+/// [decoders]: the engine's decoder list (mpv's decoder-list). Empty means unknown: assume yes,
+/// so an engine that can't tell us never loses a track.
+/// mpv lists audio and video decoders only, not subtitle ones, so Blu-ray subtitles follow
+/// TrueHD: the builds that leave out one leave out both.
+bool engineCanPlay(dynamic stream, Set<String> decoders) {
+  final need = engineDecoderFor(stream is Map ? stream['Codec']?.toString() : null);
+  if (need == null || decoders.isEmpty) return true;
+  if (need == 'pgssub') return decoders.contains('truehd');
+  return decoders.contains(need);
+}
+
+bool _isCommentaryOrDescription(dynamic s) {
+  final t = '${s['Title'] ?? ''} ${s['DisplayTitle'] ?? ''}'.toLowerCase();
+  return t.contains('comment') || t.contains('descri') || RegExp(r'\bad\b').hasMatch(t);
+}
+
+/// Another audio stream the engine can play, in place of [chosen] (Blu-ray remuxes usually
+/// carry an AC3, E-AC3 or DTS track next to TrueHD). Same language, same kind (a commentary
+/// or audio description only replaces one of its own kind), then the most channels; the
+/// earlier stream wins a tie. null: there is none.
+dynamic playableAudioInstead(List streams, dynamic chosen, Set<String> decoders) {
+  if (chosen is! Map) return null;
+  final lang = (chosen['Language'] ?? '').toString().toLowerCase();
+  final kind = _isCommentaryOrDescription(chosen);
+  dynamic pick;
+  var best = -1;
+  for (final s in streams) {
+    if (s is! Map || s['Type'] != 'Audio' || identical(s, chosen) || s['Index'] == chosen['Index']) continue;
+    if ((s['Language'] ?? '').toString().toLowerCase() != lang) continue;
+    if (_isCommentaryOrDescription(s) != kind) continue;
+    if (!engineCanPlay(s, decoders)) continue;
+    final channels = (s['Channels'] as int?) ?? 0;
+    if (channels > best) {
+      best = channels;
+      pick = s;
+    }
+  }
+  return pick;
+}

@@ -4,6 +4,7 @@
 // Mouse: moving shows the controls, click buttons, click or drag the progress bar.
 
 import 'dart:async';
+import 'dart:convert' show jsonDecode;
 import 'dart:math' as math;
 import 'dart:io' show Platform;
 
@@ -20,7 +21,7 @@ import 'ui.dart'
         phoneSidewaysOnly, kFg, kSoft, kPlaceholder, runtimeMinutes, TvCanvas, titleOf, episodeLine, sizeBucket, tvPx;
 import 'images.dart' show netImage, LogoImage;
 import 'main.dart' show Jellyfin;
-import 'banners.dart' show showPartyNotice;
+import 'banners.dart' show showPartyNotice, showBanner, bannerIcon;
 import 'syncplay.dart' show SyncPlay, SyncGroup, RoomLink, RoomVideo;
 import 'party_notice.dart' show partyColorOf;
 import 'perf.dart' show perfLog;
@@ -556,6 +557,15 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   late final TrackPrefs _tracks = TrackPrefs(widget.item);
   bool _tracksApplied = false;
 
+  // What this copy's video engine can decode (mpv's decoder-list), read once at the start.
+  // Empty: unknown, every track is assumed playable (see engineCanPlay in playback_rules.dart).
+  Set<String> _decoders = const {};
+  // The server's version was already chosen once because of a track the engine can't play:
+  // never again for this video (no back-and-forth).
+  bool _engineFallbackDone = false;
+  // The audio track was picked by hand in the menu: no quiet swap to another track.
+  bool _audioPickedByHand = false;
+
   // Jellyfin's description of one of mpv's tracks: mpv numbers each kind 1, 2, 3… in file
   // order, the same order Jellyfin lists the file's own streams.
   dynamic _streamFor(String id, String type) {
@@ -627,6 +637,99 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       ]);
       if (external != null) await _setSubtitle(_externalTrack(external));
     }
+  }
+
+  // ---------- Tracks this copy's engine can't decode ----------
+  //
+  // media_kit's Windows engine has no Dolby TrueHD and no Blu-ray (PGS) subtitle decoder, so
+  // those tracks would play silent or blank. With the original file:
+  // 1. TrueHD that wasn't picked by hand: the same language's AC3 / E-AC3 / DTS track instead
+  //    (Blu-ray remuxes usually have one), keeping the original picture.
+  // 2. Otherwise, on Automatic: the server's version, which converts the audio and draws the
+  //    Blu-ray subtitles into the picture. Once per video.
+  // 3. On "Original file": nothing changes, but a notice says why and how to fix it. Once.
+  // An engine that has both decoders (Linux, or a newer Windows engine) never gets here.
+
+  Future<Set<String>> _engineDecoders(NativePlayer mpv) async {
+    try {
+      final list = jsonDecode(await mpv.getProperty('decoder-list'));
+      if (list is! List) return const {};
+      final names = <String>{
+        for (final d in list)
+          if (d is Map) ...['${d['codec']}', '${d['driver']}'],
+      };
+      _note('engine decoders: ${names.length}, TrueHD ${names.contains('truehd') ? 'yes' : 'no'}');
+      return names;
+    } catch (e) {
+      _note('engine decoder list not available ($e)');
+      return const {};
+    }
+  }
+
+  Future<void> _checkEngineCanPlay() async {
+    if (_server || _switching || _decoders.isEmpty || !mounted) return;
+    final audio = _streamFor(player.state.track.audio.id, 'Audio');
+    final sub = _streamFor(player.state.track.subtitle.id, 'Subtitle');
+    final audioOk = audio == null || engineCanPlay(audio, _decoders);
+    final subOk = sub == null || engineCanPlay(sub, _decoders);
+    if (audioOk && subOk) return;
+
+    if (!audioOk && !_audioPickedByHand) {
+      final instead = playableAudioInstead(_streams('Audio'), audio, _decoders);
+      if (instead != null) {
+        for (final t in player.state.tracks.audio) {
+          final s = _streamFor(t.id, 'Audio');
+          if (s != null && s['Index'] == instead['Index']) {
+            _note('${_streamLabel(audio)} can\'t play on this PC: ${_streamLabel(instead)} instead');
+            await player.setAudioTrack(t);
+            if (subOk) return;
+            break;
+          }
+        }
+      }
+    }
+
+    final what = !audioOk && !subOk
+        ? 'This audio and these subtitles'
+        : !audioOk
+            ? 'Dolby TrueHD audio'
+            : 'Blu-ray (PGS) subtitles';
+    if (_engineFallbackDone) return;
+    _engineFallbackDone = true;
+    if (_mode != 'auto') {
+      _note('$what can\'t play on this PC yet (Playback is "$_mode")');
+      if (mounted && _mode == 'original') {
+        showBanner(context,
+            picture: bannerIcon(Icons.info_outline_rounded),
+            who: "Can't play this track yet",
+            text: "$what can't play on this PC yet. Set Playback to Automatic to let your server convert it.",
+            top: 72,
+            duration: const Duration(seconds: 8));
+      }
+      return;
+    }
+    _note('$what can\'t play on this PC yet: using the server\'s version');
+    // The server's version with the same choices: it converts the audio and draws Blu-ray
+    // subtitles into the picture; text subtitles stay separate.
+    if (audio != null) _serverAudio = audio['Index'] as int?;
+    _serverSub = null;
+    _serverTextSub = null;
+    if (sub != null) {
+      if (sub['IsTextSubtitleStream'] == true) {
+        _serverTextSub = sub['Index'] as int?;
+      } else {
+        _serverSub = sub['Index'] as int?;
+      }
+    }
+    if (mounted) {
+      showBanner(context,
+          picture: bannerIcon(Icons.swap_horiz_rounded),
+          who: "Using the server's version",
+          text: "$what can't play on this PC yet, so your server is converting this video.",
+          top: 72,
+          duration: const Duration(seconds: 7));
+    }
+    await _switchSource(server: true);
   }
 
   SubtitleTrack _externalTrack(dynamic s) => SubtitleTrack.uri(
@@ -917,6 +1020,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _subs.add(player.stream.duration.listen((_) => _checkLoaded()));
     // The file's tracks are known: pick the remembered audio and subtitles.
     _subs.add(player.stream.tracks.listen((_) => _applyTrackPrefs()));
+    // A track the engine can't decode (TrueHD or Blu-ray subtitles on Windows): fix it.
+    _subs.add(player.stream.track.listen((_) => _checkEngineCanPlay()));
     // Close the player when the video ends.
     // The video ended: the next episode, or back.
     _subs.add(player.stream.completed.listen((done) {
@@ -1190,6 +1295,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (mpv is NativePlayer) {
       // Decode on the GPU when the hardware supports the codec, otherwise fall back safely.
       await mpv.setProperty('hwdec', _hwdec);
+      _decoders = await _engineDecoders(mpv);
       // Dolby Vision Profile 5 (Disney+ and similar) has no normal HDR picture inside, only
       // Dolby's own colour format, so shown as-is it comes out pink and green. mpv only
       // converts it with its newer drawing engine, which the embedded player can't use yet.
@@ -1271,6 +1377,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
     // Left the player while it was still opening: don't start reporting.
     if (!mounted) return;
+    // (Track changes during the opening were skipped while it was switching.)
+    unawaited(_checkEngineCanPlay());
     if (widget.sync != null) {
       _startRoom();
       unawaited(_roomReady());
@@ -2301,6 +2409,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       for (final t in player.state.tracks.audio) {
         if (t.id == 'no') continue;
         add(_trackLabel(t.id, t.title, t.language, type: 'Audio'), t == current, () {
+          _audioPickedByHand = true;
           player.setAudioTrack(t);
           _tracks.remember('audio', _describeAudio(t));
         });
