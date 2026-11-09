@@ -178,9 +178,12 @@ class HdrSurface {
   bool screen_changed = false;
   guint watch_source = 0;
 
-  // Size of the layer in buffer pixels, and the buffer scale (main thread writes).
+  // Size of the layer in buffer pixels, and the buffer scale (main thread writes). The render
+  // thread applies size and scale together, in the same commit as a buffer of that size: a
+  // scale sent with a buffer that isn't a multiple of it is a Wayland protocol error, which
+  // closes the app (e.g. dragging the window to a screen with other scaling).
   std::atomic<int> width{1}, height{1};
-  int scale = 1;
+  std::atomic<int> scale{1};
 
   // Render thread.
   std::thread thread;
@@ -212,14 +215,14 @@ void HdrSurface::Place() {
   int x = 0, y = 0;
   gtk_widget_translate_coordinates(view, top, 0, 0, &x, &y);
   GdkWindow* gw = gtk_widget_get_window(top);
-  scale = gw ? gdk_window_get_scale_factor(gw) : 1;
-  const int w = gtk_widget_get_allocated_width(view) * scale;
-  const int h = gtk_widget_get_allocated_height(view) * scale;
+  const int sc = gw ? gdk_window_get_scale_factor(gw) : 1;
+  const int w = gtk_widget_get_allocated_width(view) * sc;
+  const int h = gtk_widget_get_allocated_height(view) * sc;
   wl_subsurface_set_position(subsurface, x, y);
-  wl_surface_set_buffer_scale(surface, scale);
-  if (w != width.load() || h != height.load()) {
-    width = w > 0 ? w : 1;
-    height = h > 0 ? h : 1;
+  if (w != width.load() || h != height.load() || sc != scale.load()) {
+    width = w > 0 ? w : sc;
+    height = h > 0 ? h : sc;
+    scale = sc;
     {
       std::lock_guard<std::mutex> lock(mutex);
       resized = true;
@@ -241,7 +244,9 @@ PreferredInfo HdrSurface::QueryPreferred() {
     wp_image_description_info_v1* about = wp_image_description_v1_get_information(preferred);
     wp_image_description_info_v1_add_listener(about, &kInfoListener, &info);
     for (int i = 0; i < 20 && !info.done; i++) wl_display_roundtrip_queue(display, queue);
-    // The info object is destroyed by the compositor after "done" (destructor event).
+    // The compositor is done with it after "done", but the app still frees its side. Freed in
+    // every case: its listener points at `info`, which is gone once this function returns.
+    wp_image_description_info_v1_destroy(about);
   }
   wp_image_description_v1_destroy(preferred);
   return info;
@@ -379,6 +384,7 @@ bool HdrSurface::StartGl() {
     return false;
   }
   egl_window = wl_egl_window_create(surface, width.load(), height.load());
+  wl_surface_set_buffer_scale(surface, scale.load());
   egl_surface = eglCreatePlatformWindowSurface(egl_display, config, egl_window, nullptr);
   if (egl_surface == EGL_NO_SURFACE) {
     g_message("frame_video hdr: eglCreatePlatformWindowSurface failed (0x%x)", eglGetError());
@@ -433,7 +439,11 @@ void HdrSurface::StopGl() {
 void HdrSurface::RenderLoop() {
   const bool ok = StartGl();
   start_ok = ok;
-  started = true;
+  {
+    std::lock_guard<std::mutex> lock(mutex);
+    started = true;
+  }
+  wake.notify_all();  // HdrOpen waits for this
   if (!ok) {
     StopGl();
     return;
@@ -449,7 +459,10 @@ void HdrSurface::RenderLoop() {
       resized = false;
     }
     const int w = width.load(), h = height.load();
-    if (do_resize) wl_egl_window_resize(egl_window, w, h, 0, 0);
+    if (do_resize) {
+      wl_egl_window_resize(egl_window, w, h, 0, 0);
+      wl_surface_set_buffer_scale(surface, scale.load());  // committed by the swap below
+    }
     const uint64_t flags = mpv_render_context_update(render);
     if (!(flags & MPV_RENDER_UPDATE_FRAME) && !do_resize) continue;
     mpv_opengl_fbo fbo{0, w, h, depth == 10 ? GL_RGB10_A2 : 0};
@@ -557,7 +570,10 @@ HdrSurface* HdrOpen(GtkWidget* view, mpv_handle* mpv, bool hdr, HdrInfo* info) {
   s->SetDescription(hdr, info);
 
   s->thread = std::thread([s] { s->RenderLoop(); });
-  while (!s->started.load()) std::this_thread::yield();
+  {
+    std::unique_lock<std::mutex> lock(s->mutex);
+    s->wake.wait(lock, [s] { return s->started.load(); });
+  }
   if (!s->start_ok.load()) {
     HdrClose(s);
     return nullptr;
@@ -565,7 +581,7 @@ HdrSurface* HdrOpen(GtkWidget* view, mpv_handle* mpv, bool hdr, HdrInfo* info) {
   s->size_handler = g_signal_connect(view, "size-allocate", G_CALLBACK(OnSizeAllocate), s);
   s->screen_changed = false;  // events from setting the layer up
   s->watch_source = g_timeout_add(500, WatchScreen, s);
-  g_message("frame_video hdr: layer open, %dx%d (scale %d)", s->width.load(), s->height.load(), s->scale);
+  g_message("frame_video hdr: layer open, %dx%d (scale %d)", s->width.load(), s->height.load(), s->scale.load());
   return s;
 }
 

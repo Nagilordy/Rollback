@@ -33,7 +33,18 @@ jobs:
             libarchive-dev
 
       # Rollback ships its own LGPL-only libmpv and FFmpeg (Ubuntu's are GPL). Built once and
-      # kept until the build script changes.
+      # kept until the build script or the Ubuntu libraries they're built against change (a
+      # libmpv built against an older libplacebo / libass / dav1d than the one packed next to it
+      # can fail to start).
+      - name: LGPL video libraries (what they're built against)
+        run: |
+          deps=$(dpkg-query -W -f '${Package}=${Version}\n' libass-dev libplacebo-dev libdav1d-dev \
+            libva-dev libdrm-dev libvulkan-dev libvdpau-dev libgnutls28-dev libpipewire-0.3-dev \
+            libpulse-dev libwayland-dev libxkbcommon-dev libegl-dev libopus-dev libvpx-dev \
+            libxml2-dev libuchardet-dev liblcms2-dev libjpeg-dev libzimg-dev libbluray-dev \
+            libarchive-dev | sort | sha256sum | cut -c1-16)
+          echo "LGPL_DEPS=$deps" >> $GITHUB_ENV
+
       - name: LGPL video libraries (cache)
         id: lgpl
         uses: actions/cache@v4
@@ -41,7 +52,7 @@ jobs:
           path: |
             lgpl/prefix
             lgpl/src/*.tar.*
-          key: lgpl-libmpv-${{ runner.os }}-${{ hashFiles('packaging/linux/build-lgpl-libmpv.sh') }}
+          key: lgpl-libmpv-${{ runner.os }}-${{ hashFiles('packaging/linux/build-lgpl-libmpv.sh') }}-${{ env.LGPL_DEPS }}
 
       - name: LGPL video libraries (build)
         if: steps.lgpl.outputs.cache-hit != 'true'

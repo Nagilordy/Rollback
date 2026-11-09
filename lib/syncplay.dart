@@ -144,6 +144,7 @@ class SyncPlay {
   String? _mySession;
   List<String> _peers = [];
   Set<String> _peerUsers = {}; // the Jellyfin user ids behind _peers (who may send to this room)
+  DateTime _unknownSenderCheck = DateTime(0); // last fresh look-up for an unknown sender
   DateTime _peersAt = DateTime(0);
   final _directIn = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get directMessages => _directIn.stream;
@@ -341,8 +342,19 @@ class SyncPlay {
       log('instant: dropped a message for another room');
       return;
     }
-    if (from != null && from.isNotEmpty && from != jf.userId && !_peerUsers.contains(from)) {
-      await _roomPeers(fresh: true); // someone who just joined
+    // Jellyfin itself says who sent it (ControllingUserId): a message without that is dropped.
+    if (from == null || from.isEmpty) {
+      log('instant: dropped a message with no sender');
+      return;
+    }
+    if (from != jf.userId && !_peerUsers.contains(from)) {
+      // Maybe someone who just joined: look again, but at most every 5 seconds, so a stream of
+      // messages from outside the room can't turn into a stream of requests to the server.
+      final now = DateTime.now();
+      if (now.difference(_unknownSenderCheck) >= const Duration(seconds: 5)) {
+        _unknownSenderCheck = now;
+        await _roomPeers(fresh: true);
+      }
       if (!_peerUsers.contains(from)) {
         log('instant: dropped a message from someone not in this room');
         return;
