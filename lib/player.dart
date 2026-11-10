@@ -84,6 +84,10 @@ String _qualityLine(dynamic item) {
 /// The screen that plays a video. Every video plays in Rollback's own player.
 /// With [sync], the video plays in a Watch together room: play, pause and seek go through the
 /// room, so everyone stays together.
+/// The player that's open right now, or null. Only the automatic tests read it
+/// (integration_test/app_test.dart), to check a video really plays.
+final openPlayer = ValueNotifier<Player?>(null);
+
 Widget playerScreen(Jellyfin jf, dynamic item, {SyncPlay? sync, String? playlistItemId, int? startTicks}) =>
     PlayerScreen(jf: jf, item: item, sync: sync, playlistItemId: playlistItemId, startTicks: startTicks);
 
@@ -991,6 +995,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   @override
   void initState() {
     super.initState();
+    openPlayer.value = player;
     // Phones: video always plays sideways (the screen it came from sets its own again on return).
     if (_phone) phoneSidewaysOnly();
     if (_phone) {
@@ -1404,6 +1409,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
   @override
   void dispose() {
+    if (openPlayer.value == player) openPlayer.value = null;
     for (final s in _subs) {
       s.cancel();
     }

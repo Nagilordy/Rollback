@@ -1,0 +1,242 @@
+# Rollback's automatic test on Windows: sets up a real Jellyfin server with small generated
+# videos on one of GitHub's Windows machines, then runs integration_test/app_test.dart, which
+# opens Rollback and uses it like a person (Home, a library, a show, playing videos, tracks,
+# seeking) and measures how smoothly each step draws.
+#
+# Started by hand: Actions tab > Windows test > Run workflow (pick the dev branch).
+# Results: the run's summary page (a table of every step), and "rollback-test" under
+# Artifacts (screenshots, report.json, Rollback's perf log and the server log).
+#
+# These machines have no graphics card (the picture is drawn by the processor), so the speed
+# numbers are for comparing one build with the next, not for how a real PC feels.
+
+name: Windows test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8  # the version Rollback is tested with
+          cache: true
+
+      # The same project setup as the Windows installer (windows.yml).
+      - name: Windows project files
+        shell: pwsh
+        run: if (-not (Test-Path windows)) { flutter create --platforms=windows --project-name player_test . }
+
+      - name: Rollback's name on Windows
+        shell: pwsh
+        run: |
+          $cmake = 'windows\CMakeLists.txt'
+          (Get-Content $cmake -Raw) -replace 'set\(BINARY_NAME "[^"]*"\)', 'set(BINARY_NAME "Rollback")' | Set-Content $cmake -NoNewline
+          $main = 'windows\runner\main.cpp'
+          (Get-Content $main -Raw) -replace 'window\.Create\(L"[^"]*"', 'window.Create(L"Rollback"' | Set-Content $main -NoNewline
+
+      # Rollback's own video engine, from the Windows installer's cache (run that workflow
+      # once after changing the engine). Without it the test uses media_kit's engine.
+      - name: Engine (from the installer's cache)
+        id: engine
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            lgpl-win/out
+            lgpl-win/src/*.tar.*
+          key: lgpl-libmpv-windows-${{ hashFiles('packaging/windows/build-lgpl-libmpv.sh') }}
+
+      - name: FFmpeg (to make the test videos)
+        shell: pwsh
+        run: |
+          choco install ffmpeg -y --no-progress | Out-Null
+          $ff = Get-ChildItem C:\ProgramData\chocolatey\lib\ffmpeg -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+          if (-not $ff) { throw 'ffmpeg not found after install' }
+          "FFMPEG=$($ff.FullName)" >> $env:GITHUB_ENV
+          & $ff.FullName -hide_banner -version | Select-Object -First 1
+
+      # A small library: a show with 6 episodes (two audio tracks and styled ASS subtitles
+      # each), a 1080p film, a 4K 10-bit HEVC film, and 24 more films so rows and grids are
+      # full. Each has its own poster and backdrop, and .nfo files so nothing is looked up online.
+      - name: Make the test videos
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function ff { & $env:FFMPEG -hide_banner -loglevel error -y @args; if ($LASTEXITCODE) { throw "ffmpeg failed: $args" } }
+          $m = 'C:\media'
+          New-Item -ItemType Directory -Force "$m\movies", "$m\shows" | Out-Null
+
+          # Styled subtitles: many lines, positioned and coloured, as anime releases have.
+          $ass = @"
+          [Script Info]
+          ScriptType: v4.00+
+          PlayResX: 1280
+          PlayResY: 720
+
+          [V4+ Styles]
+          Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+          Style: Default,Arial,48,&H00FFFFFF,&H000000FF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,3,1,2,40,40,40,1
+          Style: Sign,Arial,36,&H0000E5FF,&H000000FF,&H00301000,&H00000000,1,0,0,0,100,100,0,0,1,2,0,8,40,40,40,1
+
+          [Events]
+          Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+          "@
+          $lines = for ($i = 0; $i -lt 60; $i++) {
+            $a = [TimeSpan]::FromSeconds($i / 2); $b = [TimeSpan]::FromSeconds($i / 2 + 1.5)
+            $t = '{0:h\:mm\:ss\.ff}' ; $s = $t -f $a; $e = $t -f $b
+            "Dialogue: 0,$s,$e,Default,,0,0,0,,Line $i {\i1}in italics{\i0} with an outline"
+            "Dialogue: 1,$s,$e,Sign,,0,0,0,,{\pos($(100 + ($i * 17) % 1000),$(80 + ($i * 29) % 300))\frz$($i * 6)}Sign $i"
+          }
+          ($ass + "`n" + ($lines -join "`n")) | Set-Content "$m\subs.ass" -Encoding utf8
+
+          function nfo($path, $kind, $title, $year) {
+            "<?xml version=""1.0"" encoding=""UTF-8""?><$kind><title>$title</title><year>$year</year><plot>A generated video for Rollback's automatic test.</plot><lockdata>true</lockdata></$kind>" | Set-Content $path -Encoding utf8
+          }
+          function art($dir, $seed) {
+            ff -f lavfi -i "mandelbrot=s=1000x1500:start_scale=$(1 + $seed / 10)" -frames:v 1 -q:v 3 "$dir\poster.jpg"
+            ff -f lavfi -i "testsrc2=s=3840x2160" -vf "hue=h=$($seed * 23)" -frames:v 1 -q:v 4 "$dir\fanart.jpg"
+          }
+
+          # The show: 6 episodes of 30 s, 720p H.264, English and French audio, ASS subtitles.
+          $show = "$m\shows\Rollback Test Show (2022)"
+          New-Item -ItemType Directory -Force "$show\Season 01" | Out-Null
+          nfo "$show\tvshow.nfo" 'tvshow' 'Rollback Test Show' 2022
+          art $show 3
+          for ($e = 1; $e -le 6; $e++) {
+            $f = "$show\Season 01\Rollback Test Show S01E0$e"
+            ff -f lavfi -i "testsrc2=s=1280x720:r=24:d=30" -f lavfi -i "sine=f=$(300 + $e * 40):d=30" -f lavfi -i "sine=f=$(600 + $e * 40):d=30" -i "$m\subs.ass" `
+              -map 0 -map 1 -map 2 -map 3 -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -b:a 128k -c:s ass `
+              -metadata:s:a:0 language=eng -metadata:s:a:1 language=fre -metadata:s:s:0 language=eng "$f.mkv"
+            ff -ss 5 -i "$f.mkv" -frames:v 1 -q:v 3 "$f-thumb.jpg"
+          }
+
+          # The 1080p film: 60 s H.264 with stereo sound.
+          $d = "$m\movies\Rollback Test Film 1080p (2020)"; New-Item -ItemType Directory -Force $d | Out-Null
+          ff -f lavfi -i "testsrc2=s=1920x1080:r=24:d=60" -f lavfi -i "sine=f=440:d=60" -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac "$d\Rollback Test Film 1080p (2020).mkv"
+          nfo "$d\movie.nfo" 'movie' 'Rollback Test Film 1080p' 2020; art $d 1
+          $film = "$d\Rollback Test Film 1080p (2020).mkv"
+
+          # The 4K film: 25 s HEVC Main 10 (what 4K releases use), 24 fps.
+          $d = "$m\movies\Rollback Test Film 4K (2021)"; New-Item -ItemType Directory -Force $d | Out-Null
+          ff -f lavfi -i "testsrc2=s=3840x2160:r=24:d=25" -f lavfi -i "sine=f=520:d=25" -c:v libx265 -preset ultrafast -pix_fmt yuv420p10le -x265-params log-level=error -c:a aac "$d\Rollback Test Film 4K (2021).mkv"
+          nfo "$d\movie.nfo" 'movie' 'Rollback Test Film 4K' 2021; art $d 2
+
+          # 24 more films (copies of the 1080p one) to fill Home's rows and the library grid.
+          for ($i = 1; $i -le 24; $i++) {
+            $n = 'Rollback Filler {0:D2}' -f $i
+            $d = "$m\movies\$n ($(1990 + $i))"; New-Item -ItemType Directory -Force $d | Out-Null
+            Copy-Item $film "$d\$n ($(1990 + $i)).mkv"
+            nfo "$d\movie.nfo" 'movie' $n (1990 + $i); art $d (4 + $i)
+          }
+          Get-ChildItem $m -Recurse -File | Measure-Object Length -Sum | ForEach-Object { "{0} files, {1:N0} MB" -f $_.Count, ($_.Sum / 1MB) }
+
+      - name: Jellyfin server
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $base = 'https://repo.jellyfin.org/files/server/windows/latest-stable/amd64/'
+          $html = (Invoke-WebRequest $base -UseBasicParsing).Content
+          $zip = [regex]::Matches($html, 'href="([^"]+\.zip)"') | ForEach-Object { $_.Groups[1].Value } | Select-Object -First 1
+          if (-not $zip) { $html.Substring(0, [Math]::Min(3000, $html.Length)); throw 'No Jellyfin zip found on the download page' }
+          if ($zip -notmatch '^https?://') { $zip = ([Uri]::new([Uri]$base, $zip)).AbsoluteUri }
+          "Jellyfin: $zip"
+          Invoke-WebRequest $zip -OutFile C:\jellyfin.zip -UseBasicParsing
+          Expand-Archive C:\jellyfin.zip C:\jellyfin
+          $exe = Get-ChildItem C:\jellyfin -Recurse -Filter jellyfin.exe | Select-Object -First 1
+          if (-not $exe) { throw 'jellyfin.exe not in the zip' }
+          New-Item -ItemType Directory -Force C:\jf | Out-Null
+          Start-Process $exe.FullName -WorkingDirectory $exe.DirectoryName -WindowStyle Hidden `
+            -RedirectStandardOutput C:\jf\stdout.log -RedirectStandardError C:\jf\stderr.log `
+            -ArgumentList '--datadir', 'C:\jf\data', '--cachedir', 'C:\jf\cache', '--configdir', 'C:\jf\config', '--logdir', 'C:\jf\log', '--ffmpeg', $env:FFMPEG, '--nowebclient'
+          $s = 'http://127.0.0.1:8096'
+          for ($i = 0; $i -lt 90; $i++) {
+            try { $info = Invoke-RestMethod "$s/System/Info/Public"; break } catch { Start-Sleep 2 }
+          }
+          if (-not $info) { Get-Content C:\jf\stdout.log -Tail 50; throw 'Jellyfin did not start' }
+          "Jellyfin $($info.Version) is up"
+
+          # First-start wizard: language, the user "test" (password "test"), done.
+          $auth = 'MediaBrowser Client="Rollback test", Device="GitHub", DeviceId="rollback-ci", Version="1.0"'
+          $h = @{ Authorization = $auth }
+          function post($path, $body) { Invoke-RestMethod -Method Post "$s$path" -Headers $h -ContentType 'application/json' -Body ($body | ConvertTo-Json -Depth 6) }
+          post '/Startup/Configuration' @{ UICulture = 'en-US'; MetadataCountryCode = 'US'; PreferredMetadataLanguage = 'en' }
+          try { Invoke-RestMethod "$s/Startup/User" -Headers $h | Out-Null } catch {}
+          for ($i = 0; $i -lt 10; $i++) {
+            try { post '/Startup/User' @{ Name = 'test'; Password = 'test' }; $made = $true; break } catch { Start-Sleep 2 }
+          }
+          if (-not $made) { throw 'Could not create the test user' }
+          post '/Startup/RemoteAccess' @{ EnableRemoteAccess = $true; EnableAutomaticPortMapping = $false }
+          post '/Startup/Complete' @{}
+          $login = post '/Users/AuthenticateByName' @{ Username = 'test'; Pw = 'test' }
+          $h = @{ Authorization = "$auth, Token=""$($login.AccessToken)""" }
+          $uid = $login.User.Id
+
+          # The two libraries, then a scan.
+          foreach ($lib in @(@('Movies', 'movies', 'C:\media\movies'), @('Shows', 'tvshows', 'C:\media\shows'))) {
+            post "/Library/VirtualFolders?name=$($lib[0])&collectionType=$($lib[1])&refreshLibrary=false" `
+              @{ LibraryOptions = @{ EnableRealtimeMonitor = $false; PathInfos = @(@{ Path = $lib[2] }) } }
+          }
+          post '/Library/Refresh' @{}
+          # 26 films + 6 episodes, with their media info read.
+          for ($i = 0; $i -lt 150; $i++) {
+            Start-Sleep 4
+            $n = (Invoke-RestMethod "$s/Items?Recursive=true&IncludeItemTypes=Movie,Episode&userId=$uid&Limit=0" -Headers $h).TotalRecordCount
+            $busy = (Invoke-RestMethod "$s/ScheduledTasks?isHidden=false" -Headers $h) | Where-Object { $_.Key -eq 'RefreshLibrary' -and $_.State -ne 'Idle' }
+            if ($n -ge 32 -and -not $busy) { break }
+          }
+          "Library: $n videos"
+          if ($n -lt 32) { throw "Only $n of 32 videos were found by the scan" }
+
+      - name: Build Rollback with the test inside
+        run: flutter build windows --profile -t integration_test/app_test.dart --dart-define=TEST_SERVER=http://127.0.0.1:8096 --dart-define=TEST_USER=test --dart-define=TEST_PASS=test --dart-define=TEST_REPORT=C:\rollback-test --dart-define=FRAME_BUILD=${{ github.sha }}
+
+      - name: Use Rollback's engine
+        if: steps.engine.outputs.cache-hit == 'true'
+        shell: pwsh
+        run: |
+          Copy-Item lgpl-win\out\* build\windows\x64\runner\Profile -Recurse -Force
+          "Rollback's engine in place"
+
+      - name: Run the test
+        shell: pwsh
+        run: |
+          $exe = 'build\windows\x64\runner\Profile\Rollback.exe'
+          if (-not (Test-Path $exe)) { throw 'Rollback.exe was not built' }
+          $p = Start-Process $exe -PassThru -RedirectStandardOutput C:\rollback-stdout.log -RedirectStandardError C:\rollback-stderr.log
+          if (-not $p.WaitForExit(15 * 60 * 1000)) { $p.Kill(); "The test didn't finish in 15 minutes" }
+          "Exit code: $($p.ExitCode)"
+          Get-Content C:\rollback-stdout.log -Tail 60 -ErrorAction SilentlyContinue
+          if (Test-Path C:\rollback-test\report.md) {
+            Get-Content C:\rollback-test\report.md
+            Get-Content C:\rollback-test\report.md >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            '## Rollback test: no report (the app closed or froze before the end)' >> $env:GITHUB_STEP_SUMMARY
+          }
+          if ('${{ steps.engine.outputs.cache-hit }}' -ne 'true') {
+            "`n> Rollback's engine wasn't in the cache, so this ran with media_kit's engine (run the Windows installer once to fill it)." >> $env:GITHUB_STEP_SUMMARY
+          }
+          if ($p.ExitCode -ne 0) { throw 'Some steps failed (see the table above)' }
+
+      - name: Collect the logs
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force C:\rollback-test\logs | Out-Null
+          Copy-Item C:\rollback-stdout.log, C:\rollback-stderr.log C:\rollback-test\logs -ErrorAction SilentlyContinue
+          Get-ChildItem $env:APPDATA -Recurse -Filter 'perf-*.log' -ErrorAction SilentlyContinue | Copy-Item -Destination C:\rollback-test\logs
+          Get-ChildItem C:\jf\log -Filter *.log -ErrorAction SilentlyContinue | Copy-Item -Destination C:\rollback-test\logs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rollback-test
+          path: C:\rollback-test

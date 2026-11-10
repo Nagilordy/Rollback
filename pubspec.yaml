@@ -28,6 +28,9 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # The automatic test that uses the real app (integration_test/, run on GitHub's Windows machines).
+  integration_test:
+    sdk: flutter
 
 # Community fix for GPU video rendering on Linux with recent Flutter
 # (media-kit issue #1404, pull request #1466). Remove once it ships in a release.
