@@ -3,7 +3,8 @@
 # opens Rollback and uses it like a person (Home, a library, a show, playing videos, tracks,
 # seeking) and measures how smoothly each step draws.
 #
-# Started by hand: Actions tab > Windows test > Run workflow (pick the dev branch).
+# Runs by itself on every push to dev, and by hand (Actions tab > Windows test > Run workflow,
+# once this file is on main).
 # Results: the run's summary page (a table of every step), and "rollback-test" under
 # Artifacts (screenshots, report.json, Rollback's perf log and the server log).
 #
@@ -13,7 +14,14 @@
 name: Windows test
 
 on:
+  push:
+    branches: [dev]
   workflow_dispatch:
+
+# A newer push replaces a test still running for an older one.
+concurrency:
+  group: windows-test-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
