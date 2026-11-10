@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" font-family="Consolas, 'DejaVu Sans Mono', Menlo, monospace" font-size="15">
+  <rect width="960" height="330" rx="16" fill="#16181c"/>
+  <g transform="translate(40 30)">
+    <text fill="#e4a15a" font-family="Segoe UI, Ubuntu, Helvetica, Arial, sans-serif" font-weight="700" font-size="15">FILMS</text>
+    <g fill="#d3d8e0">
+      <text y="40">Movies/</text>
+      <text x="28" y="70">Spirited Away (2001)/</text>
+      <text x="56" y="100" fill="#f4f5f7">Spirited Away (2001).mkv</text>
+      <text x="28" y="140">Dune Part Two (2024)/</text>
+      <text x="56" y="170" fill="#f4f5f7">Dune Part Two (2024).mkv</text>
+    </g>
+    <text y="230" fill="#8e97a6" font-family="Segoe UI, Ubuntu, Helvetica, Arial, sans-serif" font-size="14">One folder per film:</text>
+    <text y="252" fill="#8e97a6" font-family="Segoe UI, Ubuntu, Helvetica, Arial, sans-serif" font-size="14">the title and (year).</text>
+  </g>
+  <line x1="470" y1="40" x2="470" y2="290" stroke="#2a2e35"/>
+  <g transform="translate(510 30)">
+    <text fill="#e4a15a" font-family="Segoe UI, Ubuntu, Helvetica, Arial, sans-serif" font-weight="700" font-size="15">SHOWS</text>
+    <g fill="#d3d8e0">
+      <text y="40">Shows/</text>
+      <text x="28" y="70">Frieren (2023)/</text>
+      <text x="56" y="100">Season 01/</text>
+      <text x="84" y="130" fill="#f4f5f7">Frieren S01E01.mkv</text>
+      <text x="84" y="160" fill="#f4f5f7">Frieren S01E02.mkv</text>
+      <text x="56" y="190">Season 02/</text>
+    </g>
+    <text y="230" fill="#8e97a6" font-family="Segoe UI, Ubuntu, Helvetica, Arial, sans-serif" font-size="14">A folder per show, one per season,</text>
+    <text y="252" fill="#8e97a6" font-family="Segoe UI, Ubuntu, Helvetica, Arial, sans-serif" font-size="14">and S01E01 in each episode's name.</text>
+  </g>
+</svg>

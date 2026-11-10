@@ -1,5 +1,9 @@
 # Getting started
 
+::: tip New to Jellyfin?
+[Set up from scratch](/guide/setup) walks you through installing a Jellyfin server too, with pictures.
+:::
+
 ## 1. Install Rollback
 
 Download it from the [Download](/download) page and install it (Windows) or make it executable (Linux).

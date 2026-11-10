@@ -18,4 +18,6 @@ Versions marked **Pre-release** on GitHub are test builds: newest features, poss
 - A **Jellyfin** server (10.9 or newer recommended), on your network or reachable over the internet.
 - That's it. Sign in with your usual Jellyfin profile.
 
+No server yet? [Set up from scratch](/guide/setup) shows how, step by step.
+
 Next: [Getting started](/guide/getting-started)

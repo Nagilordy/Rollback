@@ -30,6 +30,7 @@ export default defineConfig({
         {
           text: 'Guide',
           items: [
+            { text: 'Set up from scratch', link: '/guide/setup' },
             { text: 'Getting started', link: '/guide/getting-started' },
             { text: 'Controller and keyboard', link: '/guide/controls' },
             { text: 'Watch parties', link: '/guide/watch-party' },
