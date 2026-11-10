@@ -23,7 +23,9 @@ FFMPEG_SHA=733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1
 MPV=0.39.0
 MPV_SHA=2ca92437affb62c2b559b4419ea4785c70d023590500e8a52e95ea3ab4554683
 # ANGLE's EGL headers (only needed to build mpv's ANGLE support; nothing from them ships).
-ANGLE=ff51c70cfd6d8f774e10d5135fa94a5d6f70ba91
+# From ANGLE's chromium/6723 branch (October 2024, mpv 0.39's time): newer headers dropped the
+# Direct3D 9 names mpv 0.39 still uses.
+ANGLE=fffbc739779a2df56a464fd6853bbfb24bebb5f6
 
 fetch() {  # url file sha256
   [ -f "$SRC/$2" ] || curl -fsSL -o "$SRC/$2" "$1"
@@ -74,7 +76,7 @@ egl() {  # path-in-ANGLE sha256
 }
 egl include/EGL/egl.h b9669499729432653659b99ec9e92f3defed9207c480ec7926024f424e693f9a
 egl include/EGL/eglext.h 92fe2e491f9374afb88e9c8d96be7288f33f27db97d06610ba5671ea732f8aae
-egl include/EGL/eglext_angle.h 5419ad972070c9b74a477a4dfe589b3892ffec6ba99eb2d56b4cf8a4d267deef
+egl include/EGL/eglext_angle.h b73f7aee0138bf8adea0ad7e411823abfbad360cefe4874be02982683a6be0d7
 egl include/EGL/eglplatform.h b748729767798d85ecf8e1923552879328a76d572327b641ce737549b391cc9c
 egl include/KHR/khrplatform.h e206a6931f98ffe1c5c7ece69c4f94bbe1c9279243f40cbe7782848a0d3fa2de
 
