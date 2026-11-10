@@ -1206,8 +1206,11 @@ class _ShowScreenState extends State<ShowScreen> {
   final _epNodes = FocusNodeList('Show: Episode');
   int _lastEp = -1; // the episode that had focus last, so coming back down returns to it
   // The episode selected in the row: its name, details and whole summary replace the show's
-  // above the row (the cards keep just the number and name).
-  dynamic _shownEp;
+  // above the row (the cards keep just the number and name). In its own notifier: moving
+  // between episodes redraws only that block, not the whole page (backdrop, every card).
+  final _shownEpN = ValueNotifier<dynamic>(null);
+  dynamic get _shownEp => _shownEpN.value;
+  set _shownEp(dynamic ep) => _shownEpN.value = ep;
 
   void _setHero(bool hero) {
     if (_hero != hero || (hero && _shownEp != null)) {
@@ -1219,7 +1222,7 @@ class _ShowScreenState extends State<ShowScreen> {
   }
 
   void _showShowInfo() {
-    if (_shownEp != null) setState(() => _shownEp = null);
+    _shownEp = null;
   }
 
   bool _focusBelowButtons() => _seasons.length > 1 ? focusOn(_tabNodes[_season]) : _focusEpisode();
@@ -1256,6 +1259,7 @@ class _ShowScreenState extends State<ShowScreen> {
     _markNode.dispose();
     _tabNodes.dispose();
     _epNodes.dispose();
+    _shownEpN.dispose();
     super.dispose();
   }
 
@@ -1556,7 +1560,9 @@ class _ShowScreenState extends State<ShowScreen> {
               left: 120,
               top: _hero ? 470 : 140,
               width: 1000,
-              child: AnimatedSwitcher(
+              child: ValueListenableBuilder<dynamic>(
+                valueListenable: _shownEpN,
+                builder: (context, _, __) => AnimatedSwitcher(
                 duration: const Duration(milliseconds: 220),
                 layoutBuilder: (current, previous) => Stack(alignment: Alignment.topLeft, children: [...previous, if (current != null) current]),
                 child: (!_hero && _shownEp != null)
@@ -1639,6 +1645,7 @@ class _ShowScreenState extends State<ShowScreen> {
                   ),
                 ),
               ])),
+              ),
               ),
             ),
             // Seasons and episodes peek in at the bottom over the full artwork, and rise when
@@ -1864,7 +1871,7 @@ class _ShowScreenState extends State<ShowScreen> {
             focusNode: _epNodes[i],
             onFocus: (viaMouse) {
               _lastEp = i;
-              if (_shownEp != ep) setState(() => _shownEp = ep);
+              _shownEp = ep;
               if (!viaMouse) _setHero(false);
             },
             onSelect: () => _play(ep),

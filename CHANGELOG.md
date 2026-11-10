@@ -5,6 +5,23 @@ What changed in each version of Rollback. Newest first.
 Rollback started over at 0.1 with its new name (it was called Frame). The earlier test versions,
 0.2 and 0.3, were previews and are no longer listed here.
 
+## 0.1.1 (in testing)
+
+### Faster on small PCs (nothing changes on screen)
+- **Windows: video decoded by the graphics card stays there.** Each frame used to be copied
+  out to memory and back ("d3d11va-copy"); now it goes straight to the picture, which matters
+  most for 4K on integrated graphics.
+- **Show pages:** moving between episodes redraws only the episode's details at the top, not
+  the whole page.
+- **Home:** the backdrops of the cards next to the one you stop on are prepared in advance, so
+  moving on crossfades straight away.
+
+### Fixes
+- **Windows:** leaving full screen no longer leaves the old "Windows Basic" title bar.
+- **Windows:** a little more sound kept ready, so Bluetooth headphones and short stalls don't
+  make it crackle.
+- The log shows the refresh rate of the screen Rollback is on.
+
 ## 0.1 (pre-release, Linux)
 
 The first version of Rollback: a couch-first app for Jellyfin, made for a controller and just as

@@ -22,6 +22,8 @@ FFMPEG=ffmpeg-7.1.1
 FFMPEG_SHA=733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1
 MPV=0.39.0
 MPV_SHA=2ca92437affb62c2b559b4419ea4785c70d023590500e8a52e95ea3ab4554683
+# ANGLE's EGL headers (only needed to build mpv's ANGLE support; nothing from them ships).
+ANGLE=ff51c70cfd6d8f774e10d5135fa94a5d6f70ba91
 
 fetch() {  # url file sha256
   [ -f "$SRC/$2" ] || curl -fsSL -o "$SRC/$2" "$1"
@@ -59,6 +61,23 @@ make install
 
 echo "=== libmpv (LGPL) ==="
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+# EGL headers for mpv's ANGLE support: with it, frames decoded by the graphics card (d3d11va)
+# go straight into Rollback's picture through ANGLE ("d3d11-egl"), instead of being copied out
+# to memory and back for every frame ("d3d11va-copy"), which is slow on small PCs, above all in
+# 4K. mpv loads ANGLE (libEGL.dll, already next to Rollback) itself at run time.
+EGL_INC=$WORK/egl-include
+mkdir -p "$EGL_INC/EGL" "$EGL_INC/KHR"
+egl() {  # path-in-ANGLE sha256
+  local out=$EGL_INC/${1#include/}
+  [ -f "$out" ] || curl -fsSL -o "$out" "https://raw.githubusercontent.com/google/angle/$ANGLE/$1"
+  echo "$2  $out" | sha256sum -c -
+}
+egl include/EGL/egl.h b9669499729432653659b99ec9e92f3defed9207c480ec7926024f424e693f9a
+egl include/EGL/eglext.h 92fe2e491f9374afb88e9c8d96be7288f33f27db97d06610ba5671ea732f8aae
+egl include/EGL/eglext_angle.h 5419ad972070c9b74a477a4dfe589b3892ffec6ba99eb2d56b4cf8a4d267deef
+egl include/EGL/eglplatform.h b748729767798d85ecf8e1923552879328a76d572327b641ce737549b391cc9c
+egl include/KHR/khrplatform.h e206a6931f98ffe1c5c7ece69c4f94bbe1c9279243f40cbe7782848a0d3fa2de
+
 cd "$SRC/mpv-$MPV"
 # cplayer is built only to check the result below; Rollback ships just libmpv-2.dll.
 meson setup "$WORK/build/mpv" \
@@ -68,6 +87,7 @@ meson setup "$WORK/build/mpv" \
   -Dmanpage-build=disabled -Dhtml-build=disabled -Dpdf-build=disabled \
   -Dd3d11=enabled -Dd3d-hwaccel=enabled \
   -Dgl=enabled -Dgl-win32=enabled \
+  -Degl-angle=enabled -Degl-angle-lib=disabled -Dc_args="-I$EGL_INC" \
   -Dvulkan=enabled -Dshaderc=enabled -Dspirv-cross=enabled \
   -Dwasapi=enabled \
   -Drubberband=disabled -Dlibarchive=disabled -Dlibbluray=disabled \
@@ -77,6 +97,9 @@ meson install -C "$WORK/build/mpv"
 
 DLL=$PREFIX/bin/libmpv-2.dll
 [ -f "$DLL" ] || { echo "libmpv-2.dll was not built"; exit 1; }
+# Check: the zero-copy path through ANGLE is in (see the EGL headers above).
+grep -aq 'd3d11-egl' "$DLL" || { echo "libmpv-2.dll has no ANGLE (d3d11-egl) decoding path"; exit 1; }
+echo "libmpv-2.dll: d3d11-egl zero-copy decoding included"
 # Check: TrueHD is among the engine's audio decoders.
 "$PREFIX/bin/mpv.exe" --no-config --ad=help | grep -qw truehd || { echo "the engine has no TrueHD decoder"; exit 1; }
 # Nothing GPL-only may be linked in.

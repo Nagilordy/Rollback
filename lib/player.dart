@@ -1334,6 +1334,14 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
           await mpv.setProperty('deinterlace', 'auto');
         } catch (_) {}
       }
+      // Windows: a little more sound kept ready (mpv's default is 0.2 s). With Bluetooth
+      // headphones, or a small PC that stalls for a moment, a short buffer runs dry and the
+      // sound crackles. mpv keeps the picture in step with the sound, so nothing is late.
+      if (Platform.isWindows) {
+        try {
+          await mpv.setProperty('audio-buffer', '0.5');
+        } catch (_) {}
+      }
       // Seeks: exact on the PC (the timeline lands where you point, exact);
       // nearest keyframe on phones, which is much faster on a small CPU.
       await mpv.setProperty('hr-seek', _phone ? 'no' : 'absolute');

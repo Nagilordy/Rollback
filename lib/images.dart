@@ -170,6 +170,13 @@ class CachedNetImage extends ImageProvider<CachedNetImage> {
   int get hashCode => url.hashCode;
 }
 
+/// Loads and decodes a picture now, exactly as netImage will show it (same size, same saved
+/// copy), so it appears without waiting when it's needed.
+void precacheNet(BuildContext context, String url, {int? cacheWidth, int? cacheHeight}) {
+  precacheImage(ResizeImage.resizeIfNeeded(cacheWidth, cacheHeight, CachedNetImage(url)), context,
+      onError: (_, __) {});
+}
+
 /// Drop-in replacement for Image.network that keeps the artwork on disk.
 Widget netImage(
   String url, {

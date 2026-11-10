@@ -239,7 +239,24 @@ class _HomeScreenState extends State<HomeScreen> {
       _featured = item;
       // A show selected for a moment: fetch its page now, so opening it is instant.
       if (item?['Type'] == 'Series') jf.prefetchShow(item);
+      _prefetchNeighbours(item);
     });
+  }
+
+  // PC and TV: the backdrops of the cards either side of the one you stopped on are decoded
+  // now, so moving on crossfades straight away instead of waiting for a big picture to decode
+  // (slow on small PCs). Same pictures, same size as shown: nothing changes on screen.
+  void _prefetchNeighbours(dynamic item) {
+    if (item == null || !mounted || !isDesktop) return;
+    for (final list in [_resume, _latest]) {
+      final i = list.indexOf(item);
+      if (i < 0) continue;
+      for (final j in [i - 1, i + 1]) {
+        if (j >= 0 && j < list.length) {
+          precacheNet(context, jf.backdropFor(list[j], maxWidth: _backdropWidth), cacheWidth: _backdropWidth);
+        }
+      }
+    }
   }
 
   @override

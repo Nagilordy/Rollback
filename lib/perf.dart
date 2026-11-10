@@ -67,11 +67,20 @@ class PerfRecorder {
   }
 
   static double get _budgetUs {
+    final hz = _refreshHz;
+    return 1e6 / (hz > 20 ? hz : 60);
+  }
+
+  // The refresh rate of the screen Rollback's window is on (not just the first screen the
+  // system lists, which can be another monitor). As the system reports it: when the graphics
+  // chip can't keep up, Windows can report half the screen's real rate.
+  static double get _refreshHz {
     try {
-      final hz = WidgetsBinding.instance.platformDispatcher.displays.first.refreshRate;
-      return 1e6 / (hz > 20 ? hz : 60);
+      final views = WidgetsBinding.instance.platformDispatcher.views;
+      if (views.isNotEmpty) return views.first.display.refreshRate;
+      return WidgetsBinding.instance.platformDispatcher.displays.first.refreshRate;
     } catch (_) {
-      return 1e6 / 60;
+      return 0;
     }
   }
 
@@ -114,7 +123,8 @@ class PerfRecorder {
     } catch (_) {}
     perfLog('$_frames frames, avg ${ms(_sumTotalUs ~/ _frames)} ms, slowest build ${ms(_maxBuildUs)} ms '
         '/ draw ${ms(_maxRasterUs)} ms, $_janky over budget (${ms(_budgetUs.round())} ms)'
-        '${_janky > 0 ? ', worst ${ms(_worstUs)} ms at ${_worstWhere ?? '?'}' : ''}, memory $rss MB, window $window');
+        '${_janky > 0 ? ', worst ${ms(_worstUs)} ms at ${_worstWhere ?? '?'}' : ''}, memory $rss MB, window $window, '
+        'screen ${_refreshHz.toStringAsFixed(0)} Hz');
     _frames = _janky = _maxBuildUs = _maxRasterUs = _sumTotalUs = _worstUs = 0;
     _worstWhere = null;
   }
