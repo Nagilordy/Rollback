@@ -316,10 +316,22 @@ Future<void> _until(WidgetTester tester, bool Function() done, Duration timeout,
 Future<void> _keys(WidgetTester tester, LogicalKeyboardKey key, int times,
     {Duration gap = const Duration(milliseconds: 350)}) async {
   for (var i = 0; i < times; i++) {
-    await tester.sendKeyEvent(key);
+    // The physical key too: Flutter's simulator looks it up by debug names, which a
+    // profile build doesn't have.
+    await tester.sendKeyEvent(key, physicalKey: _physical[key]);
     await _wait(tester, gap);
   }
 }
+
+final _physical = {
+  LogicalKeyboardKey.arrowUp: PhysicalKeyboardKey.arrowUp,
+  LogicalKeyboardKey.arrowDown: PhysicalKeyboardKey.arrowDown,
+  LogicalKeyboardKey.arrowLeft: PhysicalKeyboardKey.arrowLeft,
+  LogicalKeyboardKey.arrowRight: PhysicalKeyboardKey.arrowRight,
+  LogicalKeyboardKey.enter: PhysicalKeyboardKey.enter,
+  LogicalKeyboardKey.escape: PhysicalKeyboardKey.escape,
+  LogicalKeyboardKey.pageDown: PhysicalKeyboardKey.pageDown,
+};
 
 NavigatorState? _navigator(WidgetTester tester) {
   final homes = find.byType(HomeScreen, skipOffstage: false).evaluate();

@@ -242,7 +242,7 @@ jobs:
           $p = Start-Process $exe -PassThru -RedirectStandardOutput C:\rollback-stdout.log -RedirectStandardError C:\rollback-stderr.log
           if (-not $p.WaitForExit(15 * 60 * 1000)) { $p.Kill(); "The test didn't finish in 15 minutes" }
           "Exit code: $($p.ExitCode)"
-          Get-Content C:\rollback-stdout.log -Tail 60 -ErrorAction SilentlyContinue
+          Get-Content C:\rollback-stdout.log -ErrorAction SilentlyContinue | Select-String -Pattern 'FAILED|event_simulation|app_test.dart|Exception|Error' -Context 0,2 | Select-Object -First 80
           if (Test-Path C:\rollback-test\report.md) {
             Get-Content C:\rollback-test\report.md
             Get-Content C:\rollback-test\report.md >> $env:GITHUB_STEP_SUMMARY
