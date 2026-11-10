@@ -79,7 +79,9 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          function ff { & $env:FFMPEG -hide_banner -loglevel error -y @args; if ($LASTEXITCODE) { throw "ffmpeg failed: $args" } }
+          # ffmpeg is called directly: through a PowerShell function, options like -c:v get split.
+          $ff = $env:FFMPEG; $q = '-hide_banner', '-loglevel', 'error', '-y'
+          function chk { if ($LASTEXITCODE) { throw 'ffmpeg failed (see the message above)' } }
           $m = 'C:\media'
           New-Item -ItemType Directory -Force "$m\movies", "$m\shows" | Out-Null
 
@@ -110,8 +112,8 @@ jobs:
             "<?xml version=""1.0"" encoding=""UTF-8""?><$kind><title>$title</title><year>$year</year><plot>A generated video for Rollback's automatic test.</plot><lockdata>true</lockdata></$kind>" | Set-Content $path -Encoding utf8
           }
           function art($dir, $seed) {
-            ff -f lavfi -i "mandelbrot=s=1000x1500:start_scale=$(1 + $seed / 10)" -frames:v 1 -q:v 3 "$dir\poster.jpg"
-            ff -f lavfi -i "testsrc2=s=3840x2160" -vf "hue=h=$($seed * 23)" -frames:v 1 -q:v 4 "$dir\fanart.jpg"
+            & $ff @q -f lavfi -i "mandelbrot=s=1000x1500:start_scale=$(1 + $seed / 10)" -frames:v 1 -q:v 3 "$dir\poster.jpg"; chk
+            & $ff @q -f lavfi -i "testsrc2=s=3840x2160" -vf "hue=h=$($seed * 23)" -frames:v 1 -q:v 4 "$dir\fanart.jpg"; chk
           }
 
           # The show: 6 episodes of 30 s, 720p H.264, English and French audio, ASS subtitles.
@@ -121,21 +123,21 @@ jobs:
           art $show 3
           for ($e = 1; $e -le 6; $e++) {
             $f = "$show\Season 01\Rollback Test Show S01E0$e"
-            ff -f lavfi -i "testsrc2=s=1280x720:r=24:d=30" -f lavfi -i "sine=f=$(300 + $e * 40):d=30" -f lavfi -i "sine=f=$(600 + $e * 40):d=30" -i "$m\subs.ass" `
+            & $ff @q -f lavfi -i "testsrc2=s=1280x720:r=24:d=30" -f lavfi -i "sine=f=$(300 + $e * 40):d=30" -f lavfi -i "sine=f=$(600 + $e * 40):d=30" -i "$m\subs.ass" `
               -map 0 -map 1 -map 2 -map 3 -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -b:a 128k -c:s ass `
-              -metadata:s:a:0 language=eng -metadata:s:a:1 language=fre -metadata:s:s:0 language=eng "$f.mkv"
-            ff -ss 5 -i "$f.mkv" -frames:v 1 -q:v 3 "$f-thumb.jpg"
+              -metadata:s:a:0 language=eng -metadata:s:a:1 language=fre -metadata:s:s:0 language=eng "$f.mkv"; chk
+            & $ff @q -ss 5 -i "$f.mkv" -frames:v 1 -q:v 3 "$f-thumb.jpg"; chk
           }
 
           # The 1080p film: 60 s H.264 with stereo sound.
           $d = "$m\movies\Rollback Test Film 1080p (2020)"; New-Item -ItemType Directory -Force $d | Out-Null
-          ff -f lavfi -i "testsrc2=s=1920x1080:r=24:d=60" -f lavfi -i "sine=f=440:d=60" -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac "$d\Rollback Test Film 1080p (2020).mkv"
+          & $ff @q -f lavfi -i "testsrc2=s=1920x1080:r=24:d=60" -f lavfi -i "sine=f=440:d=60" -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac "$d\Rollback Test Film 1080p (2020).mkv"; chk
           nfo "$d\movie.nfo" 'movie' 'Rollback Test Film 1080p' 2020; art $d 1
           $film = "$d\Rollback Test Film 1080p (2020).mkv"
 
           # The 4K film: 25 s HEVC Main 10 (what 4K releases use), 24 fps.
           $d = "$m\movies\Rollback Test Film 4K (2021)"; New-Item -ItemType Directory -Force $d | Out-Null
-          ff -f lavfi -i "testsrc2=s=3840x2160:r=24:d=25" -f lavfi -i "sine=f=520:d=25" -c:v libx265 -preset ultrafast -pix_fmt yuv420p10le -x265-params log-level=error -c:a aac "$d\Rollback Test Film 4K (2021).mkv"
+          & $ff @q -f lavfi -i "testsrc2=s=3840x2160:r=24:d=25" -f lavfi -i "sine=f=520:d=25" -c:v libx265 -preset ultrafast -pix_fmt yuv420p10le -x265-params log-level=error -c:a aac "$d\Rollback Test Film 4K (2021).mkv"; chk
           nfo "$d\movie.nfo" 'movie' 'Rollback Test Film 4K' 2021; art $d 2
 
           # 24 more films (copies of the 1080p one) to fill Home's rows and the library grid.
