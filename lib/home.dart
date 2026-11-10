@@ -1161,11 +1161,15 @@ class _MediaRowState extends State<_MediaRow> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AnimatedScale(
+            // Its own layer: a card growing or shrinking redraws only itself.
+            RepaintBoundary(
+              child: AnimatedScale(
               scale: f ? 1.08 : 1,
               duration: const Duration(milliseconds: 160),
               curve: Curves.easeOut,
-              child: AnimatedContainer(
+              child: Stack(clipBehavior: Clip.none, children: [
+              CardShadow(on: f),
+              AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
                 width: cardW,
                 height: cardH,
@@ -1173,12 +1177,8 @@ class _MediaRowState extends State<_MediaRow> {
                   // Shown while the picture loads, so a card never looks missing.
                   color: _placeholder,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: f
-                      ? [
-                          BoxShadow(color: _fg.withOpacity(0.9), spreadRadius: 4),
-                          BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 40, offset: const Offset(0, 20)),
-                        ]
-                      : [],
+                  // The ring; the soft shadow under it is CardShadow.
+                  boxShadow: f ? [BoxShadow(color: _fg.withOpacity(0.9), spreadRadius: 4)] : [],
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
@@ -1213,6 +1213,8 @@ class _MediaRowState extends State<_MediaRow> {
                   ]),
                 ),
               ),
+              ]),
+            ),
             ),
             const SizedBox(height: 14),
             Text(

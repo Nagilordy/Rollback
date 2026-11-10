@@ -483,11 +483,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
       scrollAlignment: 0.25,
       onSelect: () => _open(index),
       builder: (f) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        AnimatedScale(
+        // Its own layer: a poster growing or shrinking redraws only itself.
+        RepaintBoundary(
+          child: AnimatedScale(
           scale: f ? 1.07 : 1,
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOut,
-          child: AnimatedContainer(
+          child: Stack(clipBehavior: Clip.none, children: [
+          CardShadow(on: f),
+          AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             width: w,
             height: h,
@@ -495,12 +499,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
               // Shown while the poster loads, so it never looks missing.
               color: kPlaceholder,
               borderRadius: BorderRadius.circular(12),
+              // The ring; the soft shadow under it is CardShadow.
               boxShadow: f
-                  ? [
-                      const BoxShadow(color: kBg, spreadRadius: 4),
-                      BoxShadow(color: kFg.withOpacity(0.95), spreadRadius: 8),
-                      BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 40, offset: const Offset(0, 20)),
-                    ]
+                  ? [const BoxShadow(color: kBg, spreadRadius: 4), BoxShadow(color: kFg.withOpacity(0.95), spreadRadius: 8)]
                   : [],
             ),
             child: ClipRRect(
@@ -553,6 +554,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
               ]),
             ),
           ),
+          ]),
+        ),
         ),
         const SizedBox(height: 12),
         Text(item['Name']?.toString() ?? '',
@@ -1878,10 +1881,14 @@ class _ShowScreenState extends State<ShowScreen> {
             builder: (f) => SizedBox(
               width: w,
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                AnimatedScale(
+                // Its own layer: a card growing or shrinking redraws only itself.
+                RepaintBoundary(
+                  child: AnimatedScale(
                   scale: f ? 1.06 : 1,
                   duration: const Duration(milliseconds: 160),
-                  child: AnimatedContainer(
+                  child: Stack(clipBehavior: Clip.none, children: [
+                  CardShadow(on: f, radius: 14),
+                  AnimatedContainer(
                     duration: const Duration(milliseconds: 160),
                     width: w,
                     height: h,
@@ -1889,13 +1896,9 @@ class _ShowScreenState extends State<ShowScreen> {
                       // Shown while the picture loads, so a card never looks missing.
                       color: kPlaceholder,
                       borderRadius: BorderRadius.circular(14),
+                      // The ring; the soft shadow under it is CardShadow.
                       boxShadow: f
-                          ? [
-                              const BoxShadow(color: kBg, spreadRadius: 4),
-                              BoxShadow(color: kFg.withOpacity(0.95), spreadRadius: 8),
-                              BoxShadow(
-                                  color: Colors.black.withOpacity(0.6), blurRadius: 40, offset: const Offset(0, 20)),
-                            ]
+                          ? [const BoxShadow(color: kBg, spreadRadius: 4), BoxShadow(color: kFg.withOpacity(0.95), spreadRadius: 8)]
                           : [],
                     ),
                     child: ClipRRect(
@@ -1940,6 +1943,8 @@ class _ShowScreenState extends State<ShowScreen> {
                       ]),
                     ),
                   ),
+                  ]),
+                ),
                 ),
                 const SizedBox(height: 14),
                 Text(

@@ -15,6 +15,9 @@ Rollback started over at 0.1 with its new name (it was called Frame). The earlie
   the whole page.
 - **Home:** the backdrops of the cards next to the one you stop on are prepared in advance, so
   moving on crossfades straight away.
+- **Cards (Home, libraries, episodes):** the soft shadow under the selected card now fades in
+  instead of being recalculated every frame as the card grows, and each card sits on its own
+  layer, so selecting one no longer redraws the row.
 
 ### Fixes
 - **Windows:** leaving full screen no longer leaves the old "Windows Basic" title bar.

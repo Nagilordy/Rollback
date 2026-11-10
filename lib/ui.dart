@@ -228,6 +228,35 @@ class Frost extends StatelessWidget {
       Surface(radius: radius > 18 ? 18 : radius, padding: padding, child: child);
 }
 
+/// The soft drop shadow under a selected card (place it first in a Stack under the card). It
+/// fades in and out instead of growing: the blurred shadow is then the same picture on every
+/// frame, so the graphics chip draws it once and reuses it. Growing it redrew the blur on
+/// every frame of the card's animation, one of the costliest things a small graphics chip
+/// draws, above all in 4K. Same look.
+class CardShadow extends StatelessWidget {
+  const CardShadow({super.key, required this.on, this.radius = 12});
+  final bool on;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) => Positioned.fill(
+        child: IgnorePointer(
+          child: AnimatedOpacity(
+            opacity: on ? 1 : 0,
+            duration: const Duration(milliseconds: 160),
+            child: RepaintBoundary(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(radius),
+                  boxShadow: const [BoxShadow(color: Color(0x99000000), blurRadius: 40, offset: Offset(0, 20))],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
 // ---------- Phones ----------
 //
 // On a phone (not a tablet, not a computer) the screens that have one use a touch layout in
