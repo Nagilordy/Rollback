@@ -93,13 +93,29 @@ Future<void> main() async {
 
     // Sign in the way the sign-in screen does, so the app opens straight on Home.
     final jf = Jellyfin(_server);
-    await jf.login(_user, _pass);
-    await ProfileStore.setServer(_server, 'Test server');
-    await ProfileStore.remember(jf);
-
-    final items = (await jf.getPath(
-            '/Items?Recursive=true&IncludeItemTypes=Movie,Series&Fields=Path&userId=${jf.userId}'))['Items']
-        as List;
+    List items = [];
+    await _step(tester, 'Sign in to the test server', () async {
+      // The server may still be starting: try for up to a minute.
+      for (var i = 0;; i++) {
+        try {
+          await jf.login(_user, _pass);
+          break;
+        } catch (e) {
+          if (i >= 20) rethrow;
+          await _wait(tester, const Duration(seconds: 3));
+        }
+      }
+      await ProfileStore.setServer(_server, 'Test server');
+      await ProfileStore.remember(jf);
+      items = (await jf.getPath(
+              '/Items?Recursive=true&IncludeItemTypes=Movie,Series&Fields=Path&userId=${jf.userId}'))['Items']
+          as List;
+      _steps.last.notes['items'] = items.length;
+    });
+    if (!_steps.last.ok) {
+      _writeReport(rssStart);
+      return;
+    }
     dynamic named(String part) => items.firstWhere((i) => i['Name'].toString().contains(part));
     final film1080 = named('Film 1080p');
     final film4k = named('Film 4K');

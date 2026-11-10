@@ -164,15 +164,23 @@ jobs:
           $exe = Get-ChildItem C:\jellyfin -Recurse -Filter jellyfin.exe | Select-Object -First 1
           if (-not $exe) { throw 'jellyfin.exe not in the zip' }
           New-Item -ItemType Directory -Force C:\jf | Out-Null
-          Start-Process $exe.FullName -WorkingDirectory $exe.DirectoryName -WindowStyle Hidden `
-            -RedirectStandardOutput C:\jf\stdout.log -RedirectStandardError C:\jf\stderr.log `
-            -ArgumentList '--datadir', 'C:\jf\data', '--cachedir', 'C:\jf\cache', '--configdir', 'C:\jf\config', '--logdir', 'C:\jf\log', '--ffmpeg', $env:FFMPEG, '--nowebclient'
-          $s = 'http://127.0.0.1:8096'
-          for ($i = 0; $i -lt 90; $i++) {
-            try { $info = Invoke-RestMethod "$s/System/Info/Public"; break } catch { Start-Sleep 2 }
+          # Kept as a script: GitHub may stop the server when this step ends, and the test step
+          # starts it again (same data, so the setup below is kept).
+          @"
+          `$ErrorActionPreference = 'Stop'
+          try { `$info = Invoke-RestMethod 'http://127.0.0.1:8096/System/Info/Public' -TimeoutSec 5 } catch {}
+          if (`$info) { "Jellyfin `$(`$info.Version) already running"; return }
+          Start-Process '$($exe.FullName)' -WorkingDirectory '$($exe.DirectoryName)' -WindowStyle Hidden ``
+            -RedirectStandardOutput C:\jf\stdout.log -RedirectStandardError C:\jf\stderr.log ``
+            -ArgumentList '--datadir', 'C:\jf\data', '--cachedir', 'C:\jf\cache', '--configdir', 'C:\jf\config', '--logdir', 'C:\jf\log', '--ffmpeg', '$env:FFMPEG', '--nowebclient'
+          for (`$i = 0; `$i -lt 90; `$i++) {
+            try { `$info = Invoke-RestMethod 'http://127.0.0.1:8096/System/Info/Public'; break } catch { Start-Sleep 2 }
           }
-          if (-not $info) { Get-Content C:\jf\stdout.log -Tail 50; throw 'Jellyfin did not start' }
-          "Jellyfin $($info.Version) is up"
+          if (-not `$info) { Get-Content C:\jf\stdout.log -Tail 50; throw 'Jellyfin did not start' }
+          "Jellyfin `$(`$info.Version) is up"
+          "@ | Set-Content C:\jf\start.ps1
+          & C:\jf\start.ps1
+          $s = 'http://127.0.0.1:8096'
 
           # First-start wizard: language, the user "test" (password "test"), done.
           $auth = 'MediaBrowser Client="Rollback test", Device="GitHub", DeviceId="rollback-ci", Version="1.0"'
@@ -228,6 +236,9 @@ jobs:
         run: |
           $exe = 'build\windows\x64\runner\Profile\Rollback.exe'
           if (-not (Test-Path $exe)) { throw 'Rollback.exe was not built' }
+          & C:\jf\start.ps1
+          # Jellyfin answers before it's fully ready: wait until a signed-in call works.
+          Start-Sleep 5
           $p = Start-Process $exe -PassThru -RedirectStandardOutput C:\rollback-stdout.log -RedirectStandardError C:\rollback-stderr.log
           if (-not $p.WaitForExit(15 * 60 * 1000)) { $p.Kill(); "The test didn't finish in 15 minutes" }
           "Exit code: $($p.ExitCode)"
