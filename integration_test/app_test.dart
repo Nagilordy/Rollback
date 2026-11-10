@@ -265,9 +265,11 @@ Future<void> _step(WidgetTester tester, String name, Future<void> Function() bod
   final sw = Stopwatch()..start();
   try {
     await body();
-  } catch (e) {
+  } catch (e, st) {
     s.ok = false;
     s.error = e.toString().split('\n').first;
+    // Where it went wrong, in the run's log (the first few lines of the trace).
+    debugPrint('FAILED: $name: $e\n${st.toString().split('\n').take(8).join('\n')}');
     await _shot(tester, 'FAILED-${_steps.length}');
     await _recover(tester);
   }
