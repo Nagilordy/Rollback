@@ -180,6 +180,18 @@ class FrameVideoPlugin : public flutter::Plugin {
     } else if (call.method_name() == "close") {
       Close();
       result->Success();
+    } else if (call.method_name() == "refreshFrame") {
+      // After leaving full screen, window_manager puts the title bar's style back but doesn't
+      // tell Windows the frame changed (no SWP_FRAMECHANGED when the window isn't maximised),
+      // so Windows falls back to drawing the old "Windows Basic" frame. This redraws it.
+      HWND view = registrar_->GetView() ? registrar_->GetView()->GetNativeWindow() : nullptr;
+      HWND frame = view ? GetAncestor(view, GA_ROOT) : nullptr;
+      if (frame) {
+        SetWindowPos(frame, nullptr, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        RedrawWindow(frame, nullptr, nullptr, RDW_FRAME | RDW_INVALIDATE | RDW_UPDATENOW);
+      }
+      result->Success();
     } else {
       result->NotImplemented();
     }

@@ -6,6 +6,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:frame_video/frame_video.dart' show FrameVideo;
 import 'package:window_manager/window_manager.dart';
 
 import 'gamepad.dart' show padActive;
@@ -27,6 +28,8 @@ Future<void> setFullScreen(bool on) async {
   fullScreen.value = on;
   try {
     await windowManager.setFullScreen(on);
+    // Windows: leaving full screen can leave the old "Windows Basic" title bar; redraw it.
+    if (!on) await FrameVideo.refreshFrame();
     // Check the window really did it, so a problem shows in the terminal.
     await Future.delayed(const Duration(milliseconds: 500));
     final actual = await windowManager.isFullScreen();

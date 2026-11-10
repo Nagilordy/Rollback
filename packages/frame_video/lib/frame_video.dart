@@ -35,6 +35,15 @@ class FrameVideo {
     } catch (_) {}
   }
 
+  /// Windows: makes Windows redraw the title bar after leaving full screen (otherwise it can
+  /// fall back to the old "Windows Basic" frame).
+  static Future<void> refreshFrame() async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod<void>('refreshFrame');
+    } catch (_) {}
+  }
+
   // ---------- Linux (Wayland): the HDR layer ----------
   //
   // A Wayland subsurface under Rollback's window where the engine draws through libmpv's render
