@@ -177,13 +177,20 @@ jobs:
           # First-start wizard: language, the user "test" (password "test"), done.
           $auth = 'MediaBrowser Client="Rollback test", Device="GitHub", DeviceId="rollback-ci", Version="1.0"'
           $h = @{ Authorization = $auth }
-          function post($path, $body) { Invoke-RestMethod -Method Post "$s$path" -Headers $h -ContentType 'application/json' -Body ($body | ConvertTo-Json -Depth 6) }
+          # Each call is retried for up to 2 minutes: Jellyfin shows a "starting up" page for a
+          # while after it first answers.
+          function post($path, $body) {
+            for ($t = 0; ; $t++) {
+              try { return Invoke-RestMethod -Method Post "$s$path" -Headers $h -ContentType 'application/json' -Body ($body | ConvertTo-Json -Depth 6) }
+              catch {
+                if ($t -ge 40) { "POST $path failed: $($_.Exception.Message)"; throw }
+                Start-Sleep 3
+              }
+            }
+          }
           post '/Startup/Configuration' @{ UICulture = 'en-US'; MetadataCountryCode = 'US'; PreferredMetadataLanguage = 'en' }
           try { Invoke-RestMethod "$s/Startup/User" -Headers $h | Out-Null } catch {}
-          for ($i = 0; $i -lt 10; $i++) {
-            try { post '/Startup/User' @{ Name = 'test'; Password = 'test' }; $made = $true; break } catch { Start-Sleep 2 }
-          }
-          if (-not $made) { throw 'Could not create the test user' }
+          post '/Startup/User' @{ Name = 'test'; Password = 'test' }
           post '/Startup/RemoteAccess' @{ EnableRemoteAccess = $true; EnableAutomaticPortMapping = $false }
           post '/Startup/Complete' @{}
           $login = post '/Users/AuthenticateByName' @{ Username = 'test'; Pw = 'test' }
