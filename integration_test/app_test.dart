@@ -234,8 +234,8 @@ Future<void> main() async {
       await _playFor(tester, film1080, const Duration(seconds: 20));
     }, shot: 'film-1080p');
 
-    await _step(tester, 'Play the 4K 10-bit HEVC film (20 s)', () async {
-      await _playFor(tester, film4k, const Duration(seconds: 20));
+    await _step(tester, 'Play the 4K 10-bit HEVC film (12 s)', () async {
+      await _playFor(tester, film4k, const Duration(seconds: 12));
     }, shot: 'film-4k');
 
     await _step(tester, 'Back on Home afterwards', () async {
@@ -373,6 +373,8 @@ Future<void> _playFor(WidgetTester tester, dynamic item, Duration d) async {
   await _keys(tester, LogicalKeyboardKey.arrowUp, 1, gap: const Duration(seconds: 2));
   await _wait(tester, d ~/ 2);
   await _videoNotes(s);
+  _check(openPlayer.value != null && openPlayer.value!.state.position > d ~/ 2,
+      'the video stopped before the end of the test');
   for (var i = 0; i < 3 && openPlayer.value != null; i++) {
     await _keys(tester, LogicalKeyboardKey.escape, 1, gap: const Duration(milliseconds: 600));
   }
