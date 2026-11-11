@@ -224,7 +224,7 @@ class Jellyfin {
   String tokenApp = appName;
 
   String get _client =>
-      'MediaBrowser Client="${token == null ? appName : tokenApp}", Device="$_deviceName", DeviceId="$_deviceId", Version="0.1"';
+      'MediaBrowser Client="${token == null ? appName : tokenApp}", Device="$_deviceName", DeviceId="$_deviceId", Version="0.1.1"';
 
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',

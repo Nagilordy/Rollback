@@ -3,7 +3,7 @@
 ; adds a Start menu entry (and a desktop icon if wanted), and an uninstaller.
 
 #ifndef AppVersion
-  #define AppVersion "0.1"
+  #define AppVersion "0.1.1"
 #endif
 
 [Setup]

@@ -5,35 +5,38 @@ What changed in each version of Rollback. Newest first.
 Rollback started over at 0.1 with its new name (it was called Frame). The earlier test versions,
 0.2 and 0.3, were previews and are no longer listed here.
 
-## 0.1.1 (in testing)
+## 0.1.1 (in testing: Linux and Windows)
 
-- **Deleted films and shows disappear straight away** (Linux and Windows): Rollback now listens
-  for the server's "library changed" message, so a deleted item leaves Home, the library grid and
-  the show page without reopening them, and everything else refreshes.
-- **Windows, leaving full screen or resizing:** pictures are no longer decoded again at every
-  in-between window size (that briefly used gigabytes of memory and froze Home for seconds).
-- **Windows log:** the video engine writes its own log for the first 30 s of each video
-  (`mpv-<date>.log`, next to the perf log), to find out why decoding still makes a copy.
+The first version for Windows, and an update for Linux.
+
+### New (Linux and Windows)
+- **Deleted films and shows disappear straight away.** Rollback now listens for the server's
+  "library changed" message, so a deleted item leaves Home, the library grid and the show page
+  without reopening them, and everything else refreshes.
+
+### Faster (nothing changes on screen)
+- **Leaving full screen or resizing the window:** pictures are no longer decoded again at every
+  in-between size (that briefly used gigabytes of memory and froze Home for seconds).
 - **Home's first seconds:** the graphics card's effects (soft shadows, edge fades, scaled
-  artwork) are prepared off-screen behind the start screen, so Home no longer stutters the
-  first time it draws them on integrated graphics.
-
-### Faster on small PCs (nothing changes on screen)
-- **Windows: video decoded by the graphics card stays there.** Each frame used to be copied
-  out to memory and back ("d3d11va-copy"); now it goes straight to the picture, which matters
-  most for 4K on integrated graphics.
+  artwork) are prepared off-screen behind the start screen, so Home doesn't stutter the first
+  time it draws them on integrated graphics.
 - **Show pages:** moving between episodes redraws only the episode's details at the top, not
   the whole page.
 - **Home:** the backdrops of the cards next to the one you stop on are prepared in advance, so
   moving on crossfades straight away.
-- **Cards (Home, libraries, episodes):** the soft shadow under the selected card now fades in
+- **Cards (Home, libraries, episodes):** the soft shadow under the selected card fades in
   instead of being recalculated every frame as the card grows, and each card sits on its own
   layer, so selecting one no longer redraws the row.
 
+### Windows
+- **Video decoded by the graphics card stays there** (the engine is built for it; still being
+  checked: the log should say `d3d11va`, not `d3d11va-copy`).
+- **The title bar:** leaving full screen no longer leaves the old "Windows Basic" one.
+- **Sound:** a little more kept ready, so Bluetooth headphones and short stalls don't crackle.
+- **Engine log:** the first 30 s of each video are logged to `mpv-<date>.log`, next to the perf
+  log, to help find problems.
+
 ### Fixes
-- **Windows:** leaving full screen no longer leaves the old "Windows Basic" title bar.
-- **Windows:** a little more sound kept ready, so Bluetooth headphones and short stalls don't
-  make it crackle.
 - The log shows the refresh rate of the screen Rollback is on.
 
 ## 0.1 (pre-release, Linux)
