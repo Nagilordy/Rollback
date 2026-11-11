@@ -131,7 +131,7 @@ jobs:
       - name: Make the installer
         shell: pwsh
         run: |
-          $version = if ($env:GITHUB_REF -like 'refs/tags/v*') { $env:GITHUB_REF_NAME.TrimStart('v') } else { ((Select-String -Path pubspec.yaml -Pattern '^version:\s*([0-9.]+)').Matches[0].Groups[1].Value) }
+          $version = if ($env:GITHUB_REF -like 'refs/tags/v*') { $env:GITHUB_REF_NAME.TrimStart('v') } else { ((Select-String -Path installer\rollback.iss -Pattern '#define AppVersion "([0-9.]+)"').Matches[0].Groups[1].Value) }
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" installer\rollback.iss
 
       - uses: actions/upload-artifact@v4

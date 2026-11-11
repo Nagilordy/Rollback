@@ -45,6 +45,11 @@ Future<void> main() async {
   if (isDesktop) WidgetsBinding.instance.addPostFrameCallback((_) => warmUpDrawing());
 }
 
+/// Rollback's version on this system. Linux and Windows are numbered separately: Linux 0.1 is
+/// released and stays as it is; Windows is at 0.1.1 (its installer reads the same number from
+/// installer/rollback.iss).
+final String appVersion = Platform.isWindows ? '0.1.1' : '0.1.0';
+
 class TestApp extends StatefulWidget {
   const TestApp({super.key});
 
@@ -224,7 +229,7 @@ class Jellyfin {
   String tokenApp = appName;
 
   String get _client =>
-      'MediaBrowser Client="${token == null ? appName : tokenApp}", Device="$_deviceName", DeviceId="$_deviceId", Version="0.1.1"';
+      'MediaBrowser Client="${token == null ? appName : tokenApp}", Device="$_deviceName", DeviceId="$_deviceId", Version="$appVersion"';
 
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
