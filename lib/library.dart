@@ -1221,6 +1221,9 @@ class _ShowScreenState extends State<ShowScreen> {
       Navigator.of(context).maybePop();
       return;
     }
+    // Only when one of this show's episodes went: something added or deleted elsewhere in the
+    // library mustn't reload the page (it would move the selection and the episode row).
+    if (!_episodes.any(jf.isRemoved)) return;
     setState(() => _episodes = _episodes.where((e) => !jf.isRemoved(e)).toList());
     _load();
   }

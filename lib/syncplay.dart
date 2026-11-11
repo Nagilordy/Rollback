@@ -238,6 +238,13 @@ class SyncPlay {
     });
   }
 
+  // Home is gone (profile switched, signed out): stop keeping the connection, so an old
+  // profile's sign-in isn't retried forever. A party in progress still keeps its own.
+  void stopKeepOpen() {
+    _keepOpen = false;
+    _retry = 0;
+  }
+
   void _scheduleReconnect() {
     if (group.value == null && !_keepOpen) return;
     final wait = group.value != null ? 2 : [5, 15, 30, 60, 120][_retry.clamp(0, 4)];

@@ -277,6 +277,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     jf.libraryChanged.removeListener(_libraryChanged);
+    SyncPlay.of(jf).stopKeepOpen();
     _featureTimer?.cancel();
     _profileNode.dispose();
     _playNode.dispose();
