@@ -409,24 +409,15 @@ class _HomeScreenState extends State<HomeScreen> {
           child: RepaintBoundary(
             child: ValueListenableBuilder<dynamic>(
               valueListenable: _featuredN,
-              builder: (context, featured, _) => AnimatedSwitcher(
-              duration: const Duration(milliseconds: 450),
-              child: featured == null
-                  ? const ColoredBox(key: ValueKey('none'), color: _bg)
-                  // Keeps the top of the artwork (faces, titles); trims the bottom, which sits
-                  // behind the rows and the dark fade anyway.
-                  : netImage(
-                      jf.backdropFor(featured, maxWidth: _backdropWidth),
-                      key: ValueKey(jf.backdropFor(featured, maxWidth: _backdropWidth)),
-                      width: double.infinity,
-                      height: double.infinity,
-                      cacheWidth: _backdropWidth,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
-                      gaplessPlayback: true,
-                      errorBuilder: (_, __, ___) => const ColoredBox(color: _placeholder),
-                    ),
-            ),
+              // Keeps the top of the artwork (faces, titles); trims the bottom, which sits behind
+              // the rows and the dark fade anyway. Cross-fades as you move (see NetImageCrossfade).
+              builder: (context, featured, _) => NetImageCrossfade(
+                url: featured == null ? null : jf.backdropFor(featured, maxWidth: _backdropWidth),
+                cacheWidth: _backdropWidth,
+                alignment: Alignment.topCenter,
+                empty: _bg,
+                error: _placeholder,
+              ),
             ),
           ),
         ),

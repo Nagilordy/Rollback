@@ -199,7 +199,100 @@ Widget netImage(
     alignment: alignment,
     gaplessPlayback: gaplessPlayback,
     errorBuilder: errorBuilder,
+    filterQuality: netFilterQuality(cacheWidth, cacheHeight),
   );
+}
+
+/// How a picture is smoothed when drawn. Flutter's default ("medium") first builds a set of
+/// smaller copies of every picture (mipmaps) for when it's shown much smaller than it is; on
+/// weak graphics that was a big part of Home's slow frames each time new artwork appeared.
+/// A picture decoded at the size it's shown (cacheWidth / cacheHeight) never needs them, and
+/// plain smoothing looks the same. Pictures without a decode size keep the default.
+FilterQuality netFilterQuality(int? cacheWidth, int? cacheHeight) =>
+    cacheWidth != null || cacheHeight != null ? FilterQuality.low : FilterQuality.medium;
+
+/// A full-screen picture that cross-fades when it changes: the same fade as an AnimatedSwitcher
+/// (old fading out while the new one fades in, both partly see-through halfway), but each picture
+/// is drawn straight with its see-through amount. AnimatedSwitcher's fade first draws each one
+/// into an off-screen copy of the whole screen, every frame of the fade: two full-screen copies
+/// per frame, heavy on integrated graphics.
+class NetImageCrossfade extends StatefulWidget {
+  const NetImageCrossfade({
+    super.key,
+    required this.url,
+    required this.cacheWidth,
+    this.duration = const Duration(milliseconds: 450),
+    this.alignment = Alignment.center,
+    this.fit = BoxFit.cover,
+    this.empty = Colors.black,
+    this.error = Colors.black,
+  });
+
+  /// The picture's address; null shows [empty].
+  final String? url;
+  final int? cacheWidth;
+  final Duration duration;
+  final AlignmentGeometry alignment;
+  final BoxFit fit;
+  final Color empty;
+  final Color error;
+
+  @override
+  State<NetImageCrossfade> createState() => _NetImageCrossfadeState();
+}
+
+class _NetImageCrossfadeState extends State<NetImageCrossfade> with SingleTickerProviderStateMixin {
+  late final AnimationController _fade = AnimationController(vsync: this, duration: widget.duration, value: 1)
+    ..addStatusListener((s) {
+      if (s == AnimationStatus.completed && _previous != null && mounted) setState(() => _previous = null);
+    });
+  String? _previous;
+  double _previousFrom = 1;
+
+  @override
+  void didUpdateWidget(NetImageCrossfade old) {
+    super.didUpdateWidget(old);
+    if (old.url != widget.url) {
+      // A change mid-fade: the outgoing picture fades on from where it was.
+      _previousFrom = _fade.value;
+      _previous = old.url;
+      _fade.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _fade.dispose();
+    super.dispose();
+  }
+
+  Widget _picture(String? url, Animation<double> opacity) {
+    if (url == null) {
+      return FadeTransition(opacity: opacity, child: ColoredBox(color: widget.empty, child: const SizedBox.expand()));
+    }
+    return Image(
+      key: ValueKey(url),
+      image: ResizeImage.resizeIfNeeded(widget.cacheWidth, null, CachedNetImage(url)),
+      width: double.infinity,
+      height: double.infinity,
+      fit: widget.fit,
+      alignment: widget.alignment,
+      opacity: opacity,
+      gaplessPlayback: true,
+      filterQuality: netFilterQuality(widget.cacheWidth, null),
+      errorBuilder: (_, __, ___) =>
+          FadeTransition(opacity: opacity, child: ColoredBox(color: widget.error, child: const SizedBox.expand())),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fading = _fade.isAnimating || _previous != null;
+    return Stack(fit: StackFit.expand, children: [
+      if (fading) _picture(_previous, _fade.drive(Tween(begin: _previousFrom, end: 0.0))),
+      _picture(widget.url, fading ? _fade : const AlwaysStoppedAnimation(1.0)),
+    ]);
+  }
 }
 
 // ---------- Title logos ----------

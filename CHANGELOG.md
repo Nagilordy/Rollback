@@ -15,6 +15,12 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   without reopening them, and everything else refreshes.
 
 ### Faster (nothing changes on screen)
+- **Pictures are drawn without extra copies.** Flutter used to build a set of smaller copies
+  of every picture the first time it was drawn (for showing it much smaller); Rollback already
+  downloads each picture at the size it's shown, so they were never needed. Less work for the
+  graphics card each time new artwork appears, same look.
+- **Home's backdrop cross-fade** draws each picture straight with its fade, instead of drawing
+  both into full-screen off-screen copies on every frame of the fade. Same fade, same timing.
 - **Leaving full screen or resizing the window:** pictures are no longer decoded again at every
   in-between size (that briefly used gigabytes of memory and froze Home for seconds).
 - **Show pages:** moving between episodes redraws only the episode's details at the top, not
