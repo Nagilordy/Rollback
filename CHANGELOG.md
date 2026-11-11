@@ -7,6 +7,14 @@ Rollback started over at 0.1 with its new name (it was called Frame). The earlie
 
 ## 0.1.1 (in testing)
 
+- **Deleted films and shows disappear straight away** (Linux and Windows): Rollback now listens
+  for the server's "library changed" message, so a deleted item leaves Home, the library grid and
+  the show page without reopening them, and everything else refreshes.
+- **Windows, leaving full screen or resizing:** pictures are no longer decoded again at every
+  in-between window size (that briefly used gigabytes of memory and froze Home for seconds).
+- **Windows log:** the video engine writes its own log for the first 30 s of each video
+  (`mpv-<date>.log`, next to the perf log), to find out why decoding still makes a copy.
+
 ### Faster on small PCs (nothing changes on screen)
 - **Windows: video decoded by the graphics card stays there.** Each frame used to be copied
   out to memory and back ("d3d11va-copy"); now it goes straight to the picture, which matters

@@ -225,6 +225,26 @@ class SyncPlay {
 
   Future<void> connect() => _connecting ??= _connect().whenComplete(() => _connecting = null);
 
+  // Home keeps the connection open even outside a party, to hear about library changes
+  // (deleted or added items). Retried quietly, a little less often each time, if it drops.
+  bool _keepOpen = false;
+  int _retry = 0;
+  void keepOpen() {
+    _keepOpen = true;
+    connect().then((_) => _retry = 0, onError: (_) => _scheduleReconnect());
+  }
+
+  void _scheduleReconnect() {
+    if (group.value == null && !_keepOpen) return;
+    final wait = group.value != null ? 2 : [5, 15, 30, 60, 120][_retry.clamp(0, 4)];
+    _retry++;
+    Timer(Duration(seconds: wait), () {
+      if (_ws == null && (group.value != null || _keepOpen)) {
+        connect().then((_) => _retry = 0, onError: (_) => _scheduleReconnect());
+      }
+    });
+  }
+
   Future<void> _connect() async {
     if (_ws != null) return;
     final base = Uri.parse(jf.server);
@@ -263,12 +283,9 @@ class SyncPlay {
     _clock?.cancel();
     _sub?.cancel();
     _ws = null;
-    // Still in a room: reconnect, so the room's commands keep arriving.
-    if (group.value != null) {
-      Timer(const Duration(seconds: 2), () {
-        if (group.value != null) connect().then((_) {}, onError: (_) {});
-      });
-    }
+    // Still in a room (or on Home): reconnect, so the room's commands and library changes
+    // keep arriving.
+    _scheduleReconnect();
   }
 
   /// Measures the clock difference with the server a few times and keeps the most precise one.
@@ -309,6 +326,9 @@ class SyncPlay {
       case 'SyncPlayCommand':
         final d = m['Data'];
         if (d is Map) _commands.add(d.cast<String, dynamic>());
+      case 'LibraryChanged':
+        final d = m['Data'];
+        if (d is Map) jf.onLibraryChanged(d);
       case 'SyncPlayGroupUpdate':
         final d = m['Data'];
         if (d is Map) _onUpdate(d.cast<String, dynamic>());

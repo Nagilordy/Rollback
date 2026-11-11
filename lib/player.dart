@@ -6,7 +6,7 @@
 import 'dart:async';
 import 'dart:convert' show jsonDecode;
 import 'dart:math' as math;
-import 'dart:io' show Platform;
+import 'dart:io' show Directory, Platform;
 
 import 'package:flutter/gestures.dart' show GestureBinding, PointerScrollEvent;
 import 'package:flutter/material.dart';
@@ -24,7 +24,7 @@ import 'main.dart' show Jellyfin;
 import 'banners.dart' show showPartyNotice, showBanner, bannerIcon;
 import 'syncplay.dart' show SyncPlay, SyncGroup, RoomLink, RoomVideo;
 import 'party_notice.dart' show partyColorOf;
-import 'perf.dart' show perfLog;
+import 'perf.dart' show AppLog, perfLog;
 import 'tracks.dart';
 import 'phone.dart';
 import 'playback_rules.dart';
@@ -1345,6 +1345,21 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       if (Platform.isWindows) {
         try {
           await mpv.setProperty('audio-buffer', '0.5');
+        } catch (_) {}
+      }
+      // Windows: the engine's own log for the first 30 seconds of each video, next to the perf
+      // log (mpv-<date>.log), to see why it decodes on the graphics card with a copy
+      // (d3d11va-copy) instead of handing the frames straight to the picture.
+      if (Platform.isWindows) {
+        try {
+          final now = DateTime.now();
+          final day = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+          Directory(AppLog.folder).createSync(recursive: true);
+          await mpv.setProperty('msg-level', 'all=info,vd=v,hwdec=v,vo=v,libmpv_render=v');
+          await mpv.setProperty('log-file', '${AppLog.folder}\\mpv-$day.log');
+          Timer(const Duration(seconds: 30), () {
+            if (mounted) mpv.setProperty('log-file', '').catchError((_) {});
+          });
         } catch (_) {}
       }
       // Seeks: exact on the PC (the timeline lands where you point, exact);

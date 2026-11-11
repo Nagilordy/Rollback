@@ -19,7 +19,7 @@ import 'images.dart';
 import 'phone.dart';
 import 'downloads.dart' show Downloads, DownloadsScreen;
 import 'profiles.dart' show ProfileChip, ProfileStore, WhoScreen, showProfileMenu, accentFor;
-import 'syncplay.dart' show TogetherPill, playOrParty;
+import 'syncplay.dart' show SyncPlay, TogetherPill, playOrParty;
 import 'ui.dart';
 
 // ---------- Look (shared with the other screens, see ui.dart) ----------
@@ -76,6 +76,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadSaved();
     _load();
+    // Library changes from the server (something deleted or added): refresh the rows.
+    jf.libraryChanged.addListener(_libraryChanged);
+    SyncPlay.of(jf).keepOpen();
     // Downloads: pick up ones that finished while Rollback was closed.
     Downloads.instance.start();
     ProfileStore.serverName().then((n) {
@@ -260,7 +263,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  void _libraryChanged() {
+    if (!mounted) return;
+    setState(() {
+      _resume = _resume.where((i) => !jf.isRemoved(i)).toList();
+      _latest = _latest.where((i) => !jf.isRemoved(i)).toList();
+      if (jf.isRemoved(_featured)) {
+        _featured = _resume.isNotEmpty ? _resume.first : (_latest.isNotEmpty ? _latest.first : null);
+      }
+    });
+    _load();
+  }
+
+  @override
   void dispose() {
+    jf.libraryChanged.removeListener(_libraryChanged);
     _featureTimer?.cancel();
     _profileNode.dispose();
     _playNode.dispose();
@@ -344,7 +361,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // actual shape, so wider or taller windows get more room instead of black bars.
         final w = box.maxWidth, h = box.maxHeight;
         final scale = (w / 1920) < (h / 1080) ? w / 1920 : h / 1080;
-        tvDecodeScale = (scale * mq.devicePixelRatio).clamp(0.5, 2.0);
+        setTvDecodeScale(scale * mq.devicePixelRatio);
         return FittedBox(
           fit: BoxFit.fill,
           child: SizedBox(width: w / scale, height: h / scale, child: _canvas(context)),

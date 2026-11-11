@@ -301,6 +301,15 @@ EdgeInsets phoneMargins(BuildContext context, {double min = 20}) {
 double tvDecodeScale = 1;
 int tvPx(double designPixels) => (designPixels * tvDecodeScale).ceil();
 
+/// Sets [tvDecodeScale] from the window's real scale, rounded up to steps of a quarter.
+/// Without the steps, every size the window passes through (leaving full screen, dragging an
+/// edge) asked for every picture on screen to be decoded again at a slightly different size:
+/// on Windows that briefly piled up gigabytes of pictures and froze Home for seconds. Rounded
+/// up, so pictures are never shown softer than before.
+void setTvDecodeScale(double raw) {
+  tvDecodeScale = ((raw * 4).ceil() / 4).clamp(0.5, 2.0);
+}
+
 // Rounds an image size up to a step of 160 px, so small window changes reuse the same saved
 // artwork instead of downloading a slightly different size.
 int sizeBucket(int px) => ((px + 159) ~/ 160) * 160;
@@ -337,7 +346,7 @@ class _TvCanvasState extends State<TvCanvas> {
     final canvas = LayoutBuilder(builder: (context, box) {
       final w = box.maxWidth, h = box.maxHeight;
       final scale = (w / 1920) < (h / 1080) ? w / 1920 : h / 1080;
-      tvDecodeScale = (scale * mq.devicePixelRatio).clamp(0.5, 2.0);
+      setTvDecodeScale(scale * mq.devicePixelRatio);
       return FittedBox(
         fit: BoxFit.fill,
         child: SizedBox(width: w / scale, height: h / scale, child: widget.child),

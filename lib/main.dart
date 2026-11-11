@@ -545,6 +545,32 @@ class Jellyfin {
   // After watching or marking something, a show's saved pages are out of date.
   void forgetShow(String seriesId) => _memo.removeWhere((k, _) => k.contains(seriesId));
 
+  // ---------- Library changes, live from the server ----------
+  //
+  // When something is added or deleted (in Jellyfin, or after its scan notices files gone), the
+  // server says so over the live connection (SyncPlay keeps it open while Home is up). Every
+  // saved page is forgotten, open screens refresh, and deleted items disappear straight away.
+
+  /// Ticks each time the server says the library changed.
+  final libraryChanged = ValueNotifier<int>(0);
+
+  /// Every item the server said was deleted while Rollback was open.
+  final Set<String> removedIds = {};
+
+  void onLibraryChanged(Map<dynamic, dynamic> data) {
+    final ids = data['ItemsRemoved'];
+    if (ids is List) removedIds.addAll(ids.map((e) => e.toString()));
+    _memo.clear();
+    libraryChanged.value++;
+  }
+
+  /// Whether [item] (or the show or season it's in) was deleted.
+  bool isRemoved(dynamic item) =>
+      item is Map &&
+      (removedIds.contains(item['Id']?.toString()) ||
+          removedIds.contains(item['SeriesId']?.toString()) ||
+          removedIds.contains(item['SeasonId']?.toString()));
+
   Future<dynamic> item(String id, {bool fresh = false}) => _cached('item:$id', fresh, () => _getJson([
         Uri.parse('$server/Items/$id').replace(queryParameters: {'userId': userId!}),
         Uri.parse('$server/Users/$userId/Items/$id'),

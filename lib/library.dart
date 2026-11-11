@@ -99,10 +99,22 @@ class _LibraryScreenState extends State<LibraryScreen> {
   void initState() {
     super.initState();
     _reload();
+    jf.libraryChanged.addListener(_libraryChanged);
+  }
+
+  // Something was deleted on the server: it leaves the grid straight away.
+  void _libraryChanged() {
+    if (!mounted) return;
+    final before = _items.length;
+    setState(() {
+      _items.removeWhere(jf.isRemoved);
+      _total -= before - _items.length;
+    });
   }
 
   @override
   void dispose() {
+    jf.libraryChanged.removeListener(_libraryChanged);
     _grid.dispose();
     _pickerFirst.dispose();
     _sortChip.dispose();
@@ -1198,6 +1210,19 @@ class _ShowScreenState extends State<ShowScreen> {
   void initState() {
     super.initState();
     _load();
+    jf.libraryChanged.addListener(_libraryChanged);
+  }
+
+  // Something was deleted on the server: deleted episodes leave the row straight away, and the
+  // page reloads (seasons, next episode). The whole show deleted: back to where you came from.
+  void _libraryChanged() {
+    if (!mounted) return;
+    if (jf.removedIds.contains(_id)) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    setState(() => _episodes = _episodes.where((e) => !jf.isRemoved(e)).toList());
+    _load();
   }
 
   // Every focusable thing on the page, so Up and Down always go to the right place:
@@ -1253,6 +1278,7 @@ class _ShowScreenState extends State<ShowScreen> {
 
   @override
   void dispose() {
+    jf.libraryChanged.removeListener(_libraryChanged);
     _markTimer?.cancel();
     _seasonTimer?.cancel();
     _epScroll.dispose();
