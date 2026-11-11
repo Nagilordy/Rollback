@@ -888,6 +888,38 @@ class Jellyfin {
   /// The original file, exactly as it is on the server.
   String downloadUrl(String itemId) => '$server/Items/$itemId/Download';
 
+  /// Whether this profile is an administrator of the server (asked once).
+  bool? _isAdmin;
+  Future<bool> isAdmin() async {
+    final known = _isAdmin;
+    if (known != null) return known;
+    try {
+      final user = await _getJson([Uri.parse('$server/Users/$userId')]);
+      return _isAdmin = user['Policy']?['IsAdministrator'] == true;
+    } catch (_) {
+      return false; // unknown (server unreachable): ask again next time
+    }
+  }
+
+  /// Asks Jellyfin to look through one library's folders for files added or deleted on the disk
+  /// (what "Scan library" does in Jellyfin's menu): without it, files deleted on the disk stay in
+  /// the library until Jellyfin's next scan. Deleted items then come back as a library change
+  /// and leave Rollback's screens by themselves. Only for administrators (others aren't allowed),
+  /// at most once an hour per library, and it doesn't fetch posters or descriptions again.
+  final Map<String, DateTime> _rescannedAt = {};
+  Future<void> rescanLibrary(String libraryId) async {
+    final last = _rescannedAt[libraryId];
+    if (last != null && DateTime.now().difference(last) < const Duration(hours: 1)) return;
+    if (!await isAdmin()) return;
+    _rescannedAt[libraryId] = DateTime.now();
+    try {
+      await postPath('/Items/$libraryId/Refresh?Recursive=true&MetadataRefreshMode=Default'
+          '&ImageRefreshMode=Default&ReplaceAllMetadata=false&ReplaceAllImages=false');
+    } catch (_) {
+      // Only a help: if the server says no, the library stays as Jellyfin has it.
+    }
+  }
+
   /// Whether this profile may download: "Allow media downloading" in the Jellyfin dashboard.
   bool? _canDownload;
   Future<bool> canDownload() async {

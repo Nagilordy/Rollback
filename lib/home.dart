@@ -356,7 +356,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final mq = MediaQuery.of(context);
     return Scaffold(
       backgroundColor: _bg,
-      body: LayoutBuilder(builder: (context, box) {
+      // Rebuilt when the picture scale settles after a resize (see setTvDecodeScale).
+      body: ValueListenableBuilder<double>(
+        valueListenable: tvDecodeScaleN,
+        builder: (context, _, __) => LayoutBuilder(builder: (context, box) {
         // Scale the 1920x1080 design to the window, then stretch the canvas to fill the window's
         // actual shape, so wider or taller windows get more room instead of black bars.
         final w = box.maxWidth, h = box.maxHeight;
@@ -367,6 +370,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: SizedBox(width: w / scale, height: h / scale, child: _canvas(context)),
         );
       }),
+      ),
     );
   }
 

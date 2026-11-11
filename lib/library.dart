@@ -100,6 +100,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
     super.initState();
     _reload();
     jf.libraryChanged.addListener(_libraryChanged);
+    // Ask Jellyfin to notice files deleted (or added) on the disk; they then leave the grid by
+    // themselves, a few seconds later (see Jellyfin.rescanLibrary).
+    jf.rescanLibrary(_libId);
   }
 
   // Something was deleted on the server: it leaves the grid straight away.

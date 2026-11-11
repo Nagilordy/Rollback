@@ -23,15 +23,28 @@ final ValueNotifier<bool> fullScreen = ValueNotifier(false);
 // double-clicking the video.
 Future<void> toggleFullScreen() => setFullScreen(!fullScreen.value);
 
-Future<void> setFullScreen(bool on) async {
-  if (!isDesktop) return;
+// One change at a time: pressing F11 (or double-clicking) quickly used to start a new change
+// while the window was still in the middle of the last one, and Windows could end up drawing
+// the old "Windows Basic" title bar. Requests now wait their turn; only the last one counts.
+Future<void> _fullScreenChain = Future.value();
+Future<void> setFullScreen(bool on) {
+  if (!isDesktop) return Future.value();
   fullScreen.value = on;
+  return _fullScreenChain = _fullScreenChain.then((_) => _applyFullScreen());
+}
+
+Future<void> _applyFullScreen() async {
+  final on = fullScreen.value; // the latest wish, if several came in meanwhile
   try {
+    if (await windowManager.isFullScreen() == on) return;
     await windowManager.setFullScreen(on);
-    // Windows: leaving full screen can leave the old "Windows Basic" title bar; redraw it.
-    if (!on) await FrameVideo.refreshFrame();
-    // Check the window really did it, so a problem shows in the terminal.
-    await Future.delayed(const Duration(milliseconds: 500));
+    if (!on) {
+      // Windows: leaving full screen can leave the old "Windows Basic" title bar; redraw the
+      // frame now and once more when Windows has finished restyling the window.
+      await FrameVideo.refreshFrame();
+      await Future.delayed(const Duration(milliseconds: 250));
+      await FrameVideo.refreshFrame();
+    }
     final actual = await windowManager.isFullScreen();
     debugPrint('Full screen: asked ${on ? 'on' : 'off'}, window is ${actual ? 'full screen' : 'not full screen'}');
   } catch (e) {
@@ -306,8 +319,30 @@ int tvPx(double designPixels) => (designPixels * tvDecodeScale).ceil();
 /// edge) asked for every picture on screen to be decoded again at a slightly different size:
 /// on Windows that briefly piled up gigabytes of pictures and froze Home for seconds. Rounded
 /// up, so pictures are never shown softer than before.
+///
+/// While the window is being resized (or going in or out of full screen, which passes through
+/// several sizes), the new scale waits until the size has settled for 400 ms: pictures are then
+/// decoded again once, not at every step of the drag. Meanwhile they're shown slightly scaled.
+final tvDecodeScaleN = ValueNotifier<double>(1);
+bool _tvDecodeScaleSet = false;
+Timer? _tvDecodeScaleTimer;
 void setTvDecodeScale(double raw) {
-  tvDecodeScale = ((raw * 4).ceil() / 4).clamp(0.5, 2.0);
+  final next = ((raw * 4).ceil() / 4).clamp(0.5, 2.0);
+  if (!_tvDecodeScaleSet) {
+    _tvDecodeScaleSet = true;
+    tvDecodeScale = next;
+    tvDecodeScaleN.value = next;
+    return;
+  }
+  if (next == tvDecodeScale) {
+    _tvDecodeScaleTimer?.cancel();
+    return;
+  }
+  _tvDecodeScaleTimer?.cancel();
+  _tvDecodeScaleTimer = Timer(const Duration(milliseconds: 400), () {
+    tvDecodeScale = next;
+    tvDecodeScaleN.value = next; // the screens rebuild their pictures at the new size
+  });
 }
 
 // Rounds an image size up to a step of 160 px, so small window changes reuse the same saved
@@ -343,15 +378,19 @@ class _TvCanvasState extends State<TvCanvas> {
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
-    final canvas = LayoutBuilder(builder: (context, box) {
-      final w = box.maxWidth, h = box.maxHeight;
-      final scale = (w / 1920) < (h / 1080) ? w / 1920 : h / 1080;
-      setTvDecodeScale(scale * mq.devicePixelRatio);
-      return FittedBox(
-        fit: BoxFit.fill,
-        child: SizedBox(width: w / scale, height: h / scale, child: widget.child),
-      );
-    });
+    // Rebuilt when the picture scale settles after a resize (see setTvDecodeScale).
+    final canvas = ValueListenableBuilder<double>(
+      valueListenable: tvDecodeScaleN,
+      builder: (context, _, __) => LayoutBuilder(builder: (context, box) {
+        final w = box.maxWidth, h = box.maxHeight;
+        final scale = (w / 1920) < (h / 1080) ? w / 1920 : h / 1080;
+        setTvDecodeScale(scale * mq.devicePixelRatio);
+        return FittedBox(
+          fit: BoxFit.fill,
+          child: SizedBox(width: w / scale, height: h / scale, child: widget.child),
+        );
+      }),
+    );
     if (isDesktop) return canvas;
     return ValueListenableBuilder<double>(
       valueListenable: keyboardInset,

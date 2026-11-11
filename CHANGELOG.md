@@ -13,6 +13,9 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
 - **Deleted films and shows disappear straight away.** Rollback now listens for the server's
   "library changed" message, so a deleted item leaves Home, the library grid and the show page
   without reopening them, and everything else refreshes.
+- **Files deleted on the disk disappear too.** Opening a library asks Jellyfin to look through
+  its folders for files added or deleted (what "Scan library" does in Jellyfin), at most once
+  an hour, for administrator profiles. Deleted videos then leave the grid a few seconds later.
 
 ### Faster (nothing changes on screen)
 - **Pictures are drawn without extra copies.** Flutter used to build a set of smaller copies
@@ -34,7 +37,10 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
 ### Windows
 - **Video decoded by the graphics card stays there** (the engine is built for it; still being
   checked: the log should say `d3d11va`, not `d3d11va-copy`).
-- **The title bar:** leaving full screen no longer leaves the old "Windows Basic" one.
+- **The title bar:** leaving full screen no longer leaves the old "Windows Basic" one, even when
+  switching quickly (changes now happen one at a time).
+- **Resizing and full screen:** pictures are decoded at the new size once the window has
+  settled, not at every step of the change.
 - **Sound:** a little more kept ready, so Bluetooth headphones and short stalls don't crackle.
 - **Engine log:** the first 30 s of each video are logged to `mpv-<date>.log`, next to the perf
   log, to help find problems.
