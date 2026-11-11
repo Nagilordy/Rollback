@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'banners.dart' show bannerHandlesKey, showBanner, bannerIcon;
+import 'warm_up.dart' show warmUpDrawing;
 import 'crash_reports.dart' show startWithCrashReports;
 import 'video_surface.dart' show surfacePlayerSkipped;
 import 'gamepad.dart';
@@ -39,6 +40,9 @@ Future<void> main() async {
   // Crash reports (only in builds given a Sentry address, see crash_reports.dart).
   await startWithCrashReports(() => runApp(const TestApp()));
   PerfRecorder.start();
+  // Prepare the graphics card's effects behind the first screen, so Home doesn't stutter
+  // the first time it draws them (see warm_up.dart).
+  if (isDesktop) WidgetsBinding.instance.addPostFrameCallback((_) => warmUpDrawing());
 }
 
 class TestApp extends StatefulWidget {

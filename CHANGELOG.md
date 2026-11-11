@@ -14,6 +14,9 @@ Rollback started over at 0.1 with its new name (it was called Frame). The earlie
   in-between window size (that briefly used gigabytes of memory and froze Home for seconds).
 - **Windows log:** the video engine writes its own log for the first 30 s of each video
   (`mpv-<date>.log`, next to the perf log), to find out why decoding still makes a copy.
+- **Home's first seconds:** the graphics card's effects (soft shadows, edge fades, scaled
+  artwork) are prepared off-screen behind the start screen, so Home no longer stutters the
+  first time it draws them on integrated graphics.
 
 ### Faster on small PCs (nothing changes on screen)
 - **Windows: video decoded by the graphics card stays there.** Each frame used to be copied
