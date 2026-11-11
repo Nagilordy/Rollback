@@ -262,7 +262,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  @override
   void _libraryChanged() {
     if (!mounted) return;
     setState(() {

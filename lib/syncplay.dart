@@ -231,7 +231,11 @@ class SyncPlay {
   int _retry = 0;
   void keepOpen() {
     _keepOpen = true;
-    connect().then((_) => _retry = 0, onError: (_) => _scheduleReconnect());
+    connect().then((_) {
+      _retry = 0;
+    }, onError: (_) {
+      _scheduleReconnect();
+    });
   }
 
   void _scheduleReconnect() {
@@ -240,7 +244,11 @@ class SyncPlay {
     _retry++;
     Timer(Duration(seconds: wait), () {
       if (_ws == null && (group.value != null || _keepOpen)) {
-        connect().then((_) => _retry = 0, onError: (_) => _scheduleReconnect());
+        connect().then((_) {
+      _retry = 0;
+    }, onError: (_) {
+      _scheduleReconnect();
+    });
       }
     });
   }
