@@ -17,9 +17,6 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
 ### Faster (nothing changes on screen)
 - **Leaving full screen or resizing the window:** pictures are no longer decoded again at every
   in-between size (that briefly used gigabytes of memory and froze Home for seconds).
-- **Home's first seconds:** the graphics card's effects (soft shadows, edge fades, scaled
-  artwork) are prepared off-screen behind the start screen, so Home doesn't stutter the first
-  time it draws them on integrated graphics.
 - **Show pages:** moving between episodes redraws only the episode's details at the top, not
   the whole page.
 - **Home:** the backdrops of the cards next to the one you stop on are prepared in advance, so

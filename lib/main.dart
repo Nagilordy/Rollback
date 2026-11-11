@@ -13,7 +13,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'banners.dart' show bannerHandlesKey, showBanner, bannerIcon;
-import 'warm_up.dart' show warmUpDrawing;
 import 'crash_reports.dart' show startWithCrashReports;
 import 'video_surface.dart' show surfacePlayerSkipped;
 import 'gamepad.dart';
@@ -40,9 +39,6 @@ Future<void> main() async {
   // Crash reports (only in builds given a Sentry address, see crash_reports.dart).
   await startWithCrashReports(() => runApp(const TestApp()));
   PerfRecorder.start();
-  // Prepare the graphics card's effects behind the first screen, so Home doesn't stutter
-  // the first time it draws them (see warm_up.dart).
-  if (isDesktop) WidgetsBinding.instance.addPostFrameCallback((_) => warmUpDrawing());
 }
 
 /// Rollback's version (the same as pubspec.yaml and installer/rollback.iss).
@@ -564,11 +560,22 @@ class Jellyfin {
   /// Every item the server said was deleted while Rollback was open.
   final Set<String> removedIds = {};
 
+  // Jellyfin also sends this for every item it merely updates (new thumbnails, metadata), often
+  // every few seconds while it works. Only added or deleted items count, and they're gathered
+  // for 3 seconds so a big change is one refresh, not dozens.
+  Timer? _libraryTimer;
   void onLibraryChanged(Map<dynamic, dynamic> data) {
-    final ids = data['ItemsRemoved'];
-    if (ids is List) removedIds.addAll(ids.map((e) => e.toString()));
-    _memo.clear();
-    libraryChanged.value++;
+    final removed = data['ItemsRemoved'];
+    final added = data['ItemsAdded'];
+    final hasRemoved = removed is List && removed.isNotEmpty;
+    final hasAdded = added is List && added.isNotEmpty;
+    if (!hasRemoved && !hasAdded) return;
+    if (hasRemoved) removedIds.addAll(removed.map((e) => e.toString()));
+    _libraryTimer?.cancel();
+    _libraryTimer = Timer(const Duration(seconds: 3), () {
+      _memo.clear();
+      libraryChanged.value++;
+    });
   }
 
   /// Whether [item] (or the show or season it's in) was deleted.
