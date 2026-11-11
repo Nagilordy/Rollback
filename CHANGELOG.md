@@ -7,13 +7,12 @@ Rollback started over at 0.1 with its new name (it was called Frame). The earlie
 
 ## 0.1.1 (in testing: Linux and Windows)
 
+The first version for Windows, and an update for Linux (Linux 0.1 stays as released).
+
+### New (Linux and Windows)
 - **Deleted films and shows disappear straight away.** Rollback now listens for the server's
   "library changed" message, so a deleted item leaves Home, the library grid and the show page
   without reopening them, and everything else refreshes.
-
-## 0.1 for Windows (in testing)
-
-The first version for Windows: everything in 0.1 for Linux, plus these.
 
 ### Faster (nothing changes on screen)
 - **Leaving full screen or resizing the window:** pictures are no longer decoded again at every
