@@ -34,6 +34,8 @@ int _px(double designPixels) => tvPx(designPixels);
 // Loaded a bit wider than the design, so wide windows don't stretch it soft.
 // The backdrop always sits under dark shading, so it never needs more than 2560 pixels wide,
 // even on a 4K screen. That's under half the pixels of a full 4K picture to load and draw.
+final Listenable _rebuildOn = Listenable.merge([tvDecodeScaleN, effectsOff]);
+
 int get _backdropWidth => sizeBucket(tvPx(1920)).clamp(1280, 2560);
 
 TextStyle _body(double size, {FontWeight weight = FontWeight.w500, Color color = kFg, double? height}) =>
@@ -356,10 +358,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final mq = MediaQuery.of(context);
     return Scaffold(
       backgroundColor: _bg,
-      // Rebuilt when the picture scale settles after a resize (see setTvDecodeScale).
-      body: ValueListenableBuilder<double>(
-        valueListenable: tvDecodeScaleN,
-        builder: (context, _, __) => LayoutBuilder(builder: (context, box) {
+      body: ListenableBuilder(
+        // Rebuilt when the picture scale settles after a resize (see setTvDecodeScale), and for
+        // the drawing test switches (F2 then F3–F7).
+        listenable: _rebuildOn,
+        builder: (context, _) => LayoutBuilder(builder: (context, box) {
         // Scale the 1920x1080 design to the window, then stretch the canvas to fill the window's
         // actual shape, so wider or taller windows get more room instead of black bars.
         final w = box.maxWidth, h = box.maxHeight;
@@ -415,7 +418,7 @@ class _HomeScreenState extends State<HomeScreen> {
               valueListenable: _featuredN,
               // Keeps the top of the artwork (faces, titles); trims the bottom, which sits behind
               // the rows and the dark fade anyway. Cross-fades as you move (see NetImageCrossfade).
-              builder: (context, featured, _) => NetImageCrossfade(
+              builder: (context, featured, _) => effectOff(7) ? const ColoredBox(color: _bg) : NetImageCrossfade(
                 url: featured == null ? null : jf.backdropFor(featured, maxWidth: _backdropWidth),
                 cacheWidth: _backdropWidth,
                 alignment: Alignment.topCenter,
@@ -426,9 +429,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         // Shading over the backdrop: one small picture stretched, made once (see ShadeOverlay).
-        const Positioned.fill(child: ShadeOverlay(shades: [kShadeLeft, kShadeTopBottom])),
+        if (!effectOff(5)) const Positioned.fill(child: ShadeOverlay(shades: [kShadeLeft, kShadeTopBottom])),
         // Strong fade under the rows, faded in only when the rows are up (see FadingShade).
-        Positioned.fill(
+        if (!effectOff(6)) Positioned.fill(
           child: FadingShade(
             visible: !_hero,
             duration: move,
@@ -1113,25 +1116,17 @@ class _MediaRowState extends State<_MediaRow> {
               Positioned.fill(
                 child: LayoutBuilder(builder: (context, box) {
                   final edge = 110 / box.maxWidth;
+                  final list = RepaintBoundary(
+                    child: FocusTraversalGroup(child: _list()),
+                  );
+                  if (effectOff(3)) return list;
                   return ShaderMask(
                     blendMode: BlendMode.dstIn,
                     shaderCallback: (rect) => LinearGradient(
                       colors: const [Colors.transparent, Colors.white, Colors.white, Colors.transparent],
                       stops: [0.0, edge, 1 - edge, 1.0],
                     ).createShader(rect),
-                    child: RepaintBoundary(
-                      child: FocusTraversalGroup(
-                        child: ListView.separated(
-                          controller: _scroll,
-                          scrollDirection: Axis.horizontal,
-                          // Room above and below so the focused card's lift and glow aren't clipped.
-                          padding: const EdgeInsets.fromLTRB(120, 16, 120, 0),
-                          itemCount: items.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 30),
-                          itemBuilder: (_, i) => _card(items[i], i),
-                        ),
-                      ),
-                    ),
+                    child: list,
                   );
                 }),
               ),
@@ -1151,6 +1146,16 @@ class _MediaRowState extends State<_MediaRow> {
       ],
     );
   }
+
+  Widget _list() => ListView.separated(
+        controller: _scroll,
+        scrollDirection: Axis.horizontal,
+        // Room above and below so the focused card's lift and glow aren't clipped.
+        padding: const EdgeInsets.fromLTRB(120, 16, 120, 0),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 30),
+        itemBuilder: (_, i) => _card(items[i], i),
+      );
 
   Widget _card(dynamic item, int index) {
     final progress = _progress(item);

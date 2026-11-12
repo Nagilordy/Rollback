@@ -20,7 +20,7 @@ import 'images.dart' show tidyArtworkCache;
 import 'perf.dart';
 import 'profiles.dart' show StartScreen;
 import 'syncplay.dart' show SyncPlay;
-import 'ui.dart' show isDesktop, toggleFullScreen, setFullScreen, keyboardInset;
+import 'ui.dart' show isDesktop, toggleFullScreen, setFullScreen, keyboardInset, effectsOff, testEffects;
 import 'gaming_mode.dart' show inGamingMode;
 
 Future<void> main() async {
@@ -73,6 +73,21 @@ class _TestAppState extends State<TestApp> {
     if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.f2) {
       setState(() => _meter = !_meter);
       return true;
+    }
+    // Drawing test: with the overlay on, F3 to F7 switch one effect off (see testEffects).
+    if (_meter && event is KeyDownEvent) {
+      const keys = {
+        LogicalKeyboardKey.f3: 3,
+        LogicalKeyboardKey.f4: 4,
+        LogicalKeyboardKey.f5: 5,
+        LogicalKeyboardKey.f6: 6,
+        LogicalKeyboardKey.f7: 7,
+      };
+      final k = keys[event.logicalKey];
+      if (k != null) {
+        toggleEffect(k);
+        return true;
+      }
     }
     if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.f11) {
       toggleFullScreen();
@@ -131,6 +146,27 @@ class _TestAppState extends State<TestApp> {
       // The controller legend floats above every screen.
       builder: (context, child) => Stack(children: [
         if (child != null) _phoneFrame(context, child),
+        // Drawing test label (F2 overlay on): which effects are switched off.
+        if (_meter)
+          Positioned(
+            left: 16,
+            bottom: 16,
+            child: IgnorePointer(
+              child: ValueListenableBuilder<Set<int>>(
+                valueListenable: effectsOff,
+                builder: (_, off, __) => Container(
+                  padding: const EdgeInsets.all(10),
+                  color: const Color(0xCC000000),
+                  child: Text(
+                    [
+                      for (final e in testEffects.entries) 'F${e.key} ${e.value}: ${off.contains(e.key) ? 'OFF' : 'on'}',
+                    ].join('\n'),
+                    style: const TextStyle(color: Colors.white, fontSize: 16, decoration: TextDecoration.none),
+                  ),
+                ),
+              ),
+            ),
+          ),
         // While the controller is in use, the mouse is switched off inside the app: the
         // pointer is hidden and can't hover or click anything (so the controller's touchpad
         // can't interfere). A real click, the wheel, or moving the mouse a good distance
