@@ -20,7 +20,7 @@ import 'images.dart' show tidyArtworkCache;
 import 'perf.dart';
 import 'profiles.dart' show StartScreen;
 import 'syncplay.dart' show SyncPlay;
-import 'ui.dart' show isDesktop, toggleFullScreen, setFullScreen, keyboardInset, effectsOff, testEffects;
+import 'ui.dart' show isDesktop, toggleFullScreen, setFullScreen, keyboardInset, effectsOff, testEffects, toggleEffect;
 import 'gaming_mode.dart' show inGamingMode;
 
 Future<void> main() async {
@@ -76,7 +76,7 @@ class _TestAppState extends State<TestApp> {
     }
     // Drawing test: with the overlay on, F3 to F7 switch one effect off (see testEffects).
     if (_meter && event is KeyDownEvent) {
-      const keys = {
+      final keys = {
         LogicalKeyboardKey.f3: 3,
         LogicalKeyboardKey.f4: 4,
         LogicalKeyboardKey.f5: 5,
