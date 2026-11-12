@@ -1,0 +1,157 @@
+# Builds Rollback for SteamOS (and the Steam Machine) from the steamos-dev branch: the same
+# AppImage as the Linux build, kept separate so SteamOS work never touches Linux 0.1 (main) or
+# the Windows work (dev). Runs on every push to steamos-dev, or by hand (Actions tab > SteamOS
+# build > Run workflow, once this file is on main). The download is "Rollback-SteamOS" on the
+# run's page. It never publishes a release.
+
+name: SteamOS build
+
+on:
+  push:
+    branches: [steamos-dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build tools and libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            libstdc++-12-dev file desktop-file-utils \
+            libcurl4-openssl-dev libx11-dev dpkg-dev \
+            wayland-protocols libwayland-bin libwayland-dev libegl-dev \
+            build-essential nasm meson libass-dev libplacebo-dev libdav1d-dev libva-dev \
+            libdrm-dev libvulkan-dev libvdpau-dev libgnutls28-dev libpipewire-0.3-dev \
+            libpulse-dev libxkbcommon-dev libgl-dev libopus-dev libvpx-dev libxml2-dev \
+            zlib1g-dev libuchardet-dev liblcms2-dev libjpeg-dev libzimg-dev libbluray-dev \
+            libarchive-dev
+
+      # Rollback ships its own LGPL-only libmpv and FFmpeg (Ubuntu's are GPL). Built once and
+      # kept until the build script or the Ubuntu libraries they're built against change (a
+      # libmpv built against an older libplacebo / libass / dav1d than the one packed next to it
+      # can fail to start).
+      - name: LGPL video libraries (what they're built against)
+        run: |
+          deps=$(dpkg-query -W -f '${Package}=${Version}\n' libass-dev libplacebo-dev libdav1d-dev \
+            libva-dev libdrm-dev libvulkan-dev libvdpau-dev libgnutls28-dev libpipewire-0.3-dev \
+            libpulse-dev libwayland-dev libxkbcommon-dev libegl-dev libopus-dev libvpx-dev \
+            libxml2-dev libuchardet-dev liblcms2-dev libjpeg-dev libzimg-dev libbluray-dev \
+            libarchive-dev | sort | sha256sum | cut -c1-16)
+          echo "LGPL_DEPS=$deps" >> $GITHUB_ENV
+
+      - name: LGPL video libraries (cache)
+        id: lgpl
+        uses: actions/cache@v4
+        with:
+          path: |
+            lgpl/prefix
+            lgpl/src/*.tar.*
+          key: lgpl-libmpv-${{ runner.os }}-${{ hashFiles('packaging/linux/build-lgpl-libmpv.sh') }}-${{ env.LGPL_DEPS }}
+
+      - name: LGPL video libraries (build)
+        if: steps.lgpl.outputs.cache-hit != 'true'
+        run: packaging/linux/build-lgpl-libmpv.sh lgpl
+
+      - name: Use the LGPL libmpv for the build
+        run: |
+          echo "PKG_CONFIG_PATH=$PWD/lgpl/prefix/lib/pkgconfig" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$PWD/lgpl/prefix/lib" >> $GITHUB_ENV
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8  # the version Rollback is tested with
+          cache: true
+
+      - name: Linux project files
+        run: test -d linux || flutter create --platforms=linux --project-name player_test .
+
+      # Rollback's window can be see-through where Rollback draws nothing, so the new player's video
+      # (drawn under the window, packages/frame_video) shows through behind the controls:
+      # an RGBA window and a clear Flutter background. Every screen paints its own background,
+      # so nothing else changes.
+      - name: See-through window (for the new player)
+        run: |
+          python3 - <<'PY'
+          import re
+          p = 'linux/runner/my_application.cc'
+          s = open(p).read()
+          if 'gdk_screen_get_rgba_visual' not in s:
+              m = re.search(r'GtkWindow\* window =[^;]*;\n', s)
+              if m:
+                  add = ('  {\n'
+                         '    GdkScreen* screen = gtk_window_get_screen(window);\n'
+                         '    GdkVisual* visual = gdk_screen_get_rgba_visual(screen);\n'
+                         '    if (visual != nullptr && gdk_screen_is_composited(screen)) {\n'
+                         '      gtk_widget_set_visual(GTK_WIDGET(window), visual);\n'
+                         '      gtk_widget_set_app_paintable(GTK_WIDGET(window), TRUE);\n'
+                         '    }\n'
+                         '  }\n')
+                  s = s[:m.end()] + add + s[m.end():]
+                  print('RGBA window: added')
+              else:
+                  print('::warning::RGBA window: window creation line not found')
+          if 'fl_view_set_background_color' in s:
+              s = re.sub(r'gdk_rgba_parse\(&background_color, "#[0-9A-Fa-f]+"\)',
+                         'gdk_rgba_parse(&background_color, "#00000000")', s)
+              print('Clear background: set')
+          else:
+              m = re.search(r'FlView\* view = fl_view_new\(project\);\n', s)
+              if m:
+                  add = ('  GdkRGBA frame_clear;\n'
+                         '  gdk_rgba_parse(&frame_clear, "#00000000");\n'
+                         '  fl_view_set_background_color(view, &frame_clear);\n')
+                  s = s[:m.end()] + add + s[m.end():]
+                  print('Clear background: added')
+              else:
+                  print('::warning::Clear background: view creation line not found')
+          open(p, 'w').write(s)
+          PY
+          grep -n "rgba\|background_color\|frame_clear" linux/runner/my_application.cc || true
+
+      # The new player's engine draws into a window inside Rollback from its own threads. Xlib
+      # (X11) then has to be in its thread-safe mode, switched on before anything else uses it,
+      # or the app aborts ("[xcb] Unknown sequence number"). Harmless under Wayland.
+      - name: Thread-safe X11 (for the new player)
+        run: |
+          python3 - <<'PY'
+          p = 'linux/runner/main.cc'
+          s = open(p).read()
+          if 'XInitThreads' not in s:
+              s = '#include <X11/Xlib.h>\n' + s
+              s = s.replace('int main(int argc, char** argv) {',
+                            'int main(int argc, char** argv) {\n  XInitThreads();', 1)
+              open(p, 'w').write(s)
+          print(open(p).read())
+          for p in ['linux/runner/CMakeLists.txt', 'linux/CMakeLists.txt']:
+              try:
+                  s = open(p).read()
+              except FileNotFoundError:
+                  continue
+              if 'PkgConfig::GTK)' in s and 'X11)' not in s:
+                  s = s.replace('PkgConfig::GTK)', 'PkgConfig::GTK X11)', 1)
+                  open(p, 'w').write(s)
+                  print('linked X11 in', p)
+                  break
+          PY
+
+      - name: Build
+        # SENTRY_DSN (a repository secret) turns on crash reports; empty = off.
+        run: flutter build linux --release --dart-define=FRAME_BUILD=${GITHUB_SHA::7} --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+
+      - name: Pack the AppImage
+        run: packaging/linux/pack-appimage.sh lgpl/prefix out && mv out/Rollback-x86_64.AppImage .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Rollback-SteamOS
+          path: Rollback-x86_64.AppImage
+          # Kept 14 days: the repo's storage for downloads is limited.
+          retention-days: 14
