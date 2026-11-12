@@ -22,6 +22,8 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   size of the window and shown as is, instead of being drawn from scratch on every frame: that
   alone took about 10 ms of every frame on Windows, more than the rest of Home together. Same
   smooth fade.
+- **The dark fade under the rows** (Home, show pages) is drawn the same way: once, then faded in
+  and out as a finished picture.
 - **Pictures are drawn without extra copies.** Flutter used to build a set of smaller copies
   of every picture the first time it was drawn (for showing it much smaller); Rollback already
   downloads each picture at the size it's shown, so they were never needed. Less work for the

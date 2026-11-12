@@ -10,6 +10,7 @@ import 'package:frame_video/frame_video.dart' show FrameVideo;
 import 'package:window_manager/window_manager.dart';
 
 import 'gamepad.dart' show padActive;
+import 'images.dart' show ShadeOverlay;
 
 // ---------- Full screen (PC only) ----------
 
@@ -138,15 +139,18 @@ class FadingShade extends StatelessWidget {
         curve: curve,
         builder: (context, t, _) {
           if (t <= 0.001) return const SizedBox.shrink();
-          return DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
+          // Drawn once at the window's size and faded as a picture (see ShadeOverlay): a live
+          // full-screen gradient on every frame was heavy on integrated graphics.
+          return ShadeOverlay(
+            shades: [
+              LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [for (final a in alphas) kBg.withOpacity((a * t).clamp(0.0, 1.0))],
+                colors: [for (final a in alphas) kBg.withOpacity(a.clamp(0.0, 1.0))],
                 stops: stops,
               ),
-            ),
+            ],
+            opacity: t.clamp(0.0, 1.0),
           );
         },
       ),

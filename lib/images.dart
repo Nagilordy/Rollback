@@ -720,8 +720,12 @@ class _BakedBackdropState extends State<BakedBackdrop> {
 /// each frame only shows a finished picture. Made half a second after the window settles, shared
 /// by every screen; until then (and while the window is resized) the live gradients are used.
 class ShadeOverlay extends StatefulWidget {
-  const ShadeOverlay({super.key, required this.shades});
+  const ShadeOverlay({super.key, required this.shades, this.opacity = 1});
   final List<Gradient> shades;
+
+  /// How much of it shows (0 to 1), for fading it in and out: the finished picture is simply
+  /// drawn more see-through, which costs nothing extra.
+  final double opacity;
 
   @override
   State<ShadeOverlay> createState() => _ShadeOverlayState();
@@ -778,12 +782,18 @@ class _ShadeOverlayState extends State<ShadeOverlay> {
                 (baked.size.width - px.width).abs() < 1.5 &&
                 (baked.size.height - px.height).abs() < 1.5;
             if (fits) {
-              return RawImage(image: baked.image, fit: BoxFit.fill, filterQuality: FilterQuality.none);
+              return RawImage(
+                image: baked.image,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.none,
+                opacity: widget.opacity >= 1 ? null : AlwaysStoppedAnimation(widget.opacity),
+              );
             }
             _bakeShades(key, widget.shades, px);
-            return Stack(fit: StackFit.expand, children: [
+            final live = Stack(fit: StackFit.expand, children: [
               for (final s in widget.shades) DecoratedBox(decoration: BoxDecoration(gradient: s)),
             ]);
+            return widget.opacity >= 1 ? live : Opacity(opacity: widget.opacity, child: live);
           },
         ),
       ),
