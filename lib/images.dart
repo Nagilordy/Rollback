@@ -712,20 +712,80 @@ class _BakedBackdropState extends State<BakedBackdrop> {
 
 /// The shading over a backdrop (dark on the left, soft fade top and bottom).
 ///
-/// Drawn directly as gradients: the graphics card smooths (dithers) them, so dark fades stay
-/// seamless. A small pre-made picture stretched to 4K showed visible steps ("bars") in the
-/// dark fade over bright artwork. Its own layer, so changing the backdrop doesn't redraw it.
-class ShadeOverlay extends StatelessWidget {
+/// The gradients are smoothed (dithered) by the graphics card, so dark fades stay seamless; a
+/// small pre-made picture stretched to 4K showed visible steps ("bars"). But drawing them live
+/// cost the graphics card about 10 ms on every frame on Windows (more than everything else on
+/// Home together). So they're drawn once, smoothed, into a picture exactly the window's size in
+/// pixels, and that picture is shown one-to-one: nothing is stretched, so it looks the same, and
+/// each frame only shows a finished picture. Made half a second after the window settles, shared
+/// by every screen; until then (and while the window is resized) the live gradients are used.
+class ShadeOverlay extends StatefulWidget {
   const ShadeOverlay({super.key, required this.shades});
   final List<Gradient> shades;
 
   @override
+  State<ShadeOverlay> createState() => _ShadeOverlayState();
+}
+
+class _BakedShade {
+  _BakedShade(this.size, this.image);
+  final Size size; // in pixels
+  final ui.Image image;
+}
+
+final Map<int, _BakedShade> _bakedShades = {};
+final _shadesBaked = ValueNotifier<int>(0);
+final Map<int, Timer> _shadeTimers = {};
+
+void _bakeShades(int key, List<Gradient> shades, Size px) {
+  _shadeTimers[key]?.cancel();
+  _shadeTimers[key] = Timer(const Duration(milliseconds: 500), () async {
+    try {
+      final w = px.width.round(), h = px.height.round();
+      if (w <= 0 || h <= 0 || w > 8192 || h > 8192) return;
+      final rect = Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble());
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder, rect);
+      for (final g in shades) {
+        canvas.drawRect(rect, Paint()..shader = g.createShader(rect));
+      }
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(w, h);
+      picture.dispose();
+      final old = _bakedShades[key];
+      _bakedShades[key] = _BakedShade(Size(w.toDouble(), h.toDouble()), image);
+      _shadesBaked.value++;
+      // The old picture may still be on screen for this frame: let it go after the next one.
+      if (old != null) WidgetsBinding.instance.addPostFrameCallback((_) => old.image.dispose());
+    } catch (_) {
+      // Only a speed-up: the live gradients stay.
+    }
+  });
+}
+
+class _ShadeOverlayState extends State<ShadeOverlay> {
+  @override
   Widget build(BuildContext context) {
+    final key = Object.hashAll(widget.shades);
+    final px = MediaQuery.sizeOf(context) * MediaQuery.devicePixelRatioOf(context);
     return IgnorePointer(
       child: RepaintBoundary(
-        child: Stack(fit: StackFit.expand, children: [
-          for (final s in shades) DecoratedBox(decoration: BoxDecoration(gradient: s)),
-        ]),
+        child: ValueListenableBuilder<int>(
+          valueListenable: _shadesBaked,
+          builder: (context, _, __) {
+            final baked = _bakedShades[key];
+            final fits = baked != null &&
+                (baked.size.width - px.width).abs() < 1.5 &&
+                (baked.size.height - px.height).abs() < 1.5;
+            if (fits) {
+              return RawImage(image: baked.image, fit: BoxFit.fill, filterQuality: FilterQuality.none);
+            }
+            _bakeShades(key, widget.shades, px);
+            return Stack(fit: StackFit.expand, children: [
+              for (final s in widget.shades) DecoratedBox(decoration: BoxDecoration(gradient: s)),
+            ]);
+          },
+        ),
       ),
     );
   }
