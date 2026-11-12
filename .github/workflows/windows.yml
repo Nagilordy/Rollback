@@ -138,6 +138,8 @@ jobs:
         with:
           name: RollbackSetup
           path: installer\Output\RollbackSetup.exe
+          # Kept 14 days: the repo's storage for downloads is limited (releases keep theirs).
+          retention-days: 14
 
       # Windows joins the releases once it has been tested: until then the installer stays a
       # build download only. To attach it, set the repository variable RELEASE_WINDOWS to true

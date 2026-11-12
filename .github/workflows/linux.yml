@@ -152,6 +152,8 @@ jobs:
         with:
           name: Rollback-Linux
           path: Rollback-x86_64.AppImage
+          # Kept 14 days: the repo's storage for downloads is limited (releases keep theirs).
+          retention-days: 14
 
       # The release notes: this version's section of CHANGELOG.md.
       - name: Release notes (tags only)
