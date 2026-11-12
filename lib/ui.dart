@@ -246,34 +246,13 @@ class Frost extends StatelessWidget {
 /// frame, so the graphics chip draws it once and reuses it. Growing it redrew the blur on
 /// every frame of the card's animation, one of the costliest things a small graphics chip
 /// draws, above all in 4K. Same look.
-// ---------- Drawing test (temporary) ----------
-//
-// With the performance overlay on (F2), F3 to F7 each switch one effect off, to see which one
-// costs the graphics card the most (the overlay's Raster number). For testing only.
-const testEffects = {
-  3: 'row edge fade',
-  4: 'card shadows',
-  5: 'backdrop shading',
-  6: 'fade under rows',
-  7: 'backdrop',
-};
-final effectsOff = ValueNotifier<Set<int>>({});
-bool effectOff(int key) => effectsOff.value.contains(key);
-void toggleEffect(int key) {
-  final next = {...effectsOff.value};
-  next.contains(key) ? next.remove(key) : next.add(key);
-  effectsOff.value = next;
-}
-
 class CardShadow extends StatelessWidget {
   const CardShadow({super.key, required this.on, this.radius = 12});
   final bool on;
   final double radius;
 
   @override
-  Widget build(BuildContext context) => effectOff(4)
-      ? const SizedBox.shrink()
-      : Positioned.fill(
+  Widget build(BuildContext context) => Positioned.fill(
         child: IgnorePointer(
           child: AnimatedOpacity(
             opacity: on ? 1 : 0,
