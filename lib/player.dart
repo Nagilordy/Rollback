@@ -18,7 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'gamepad.dart' show PadHint, PadHints, PadButton, padActive, fullScreenHint;
 import 'ui.dart'
     show Focusable, FocusLinks, focusOn, isDesktop, toggleFullScreen, tvBody, tvDisplay,
-        phoneSidewaysOnly, kFg, kSoft, kPlaceholder, runtimeMinutes, TvCanvas, titleOf, episodeLine, sizeBucket, tvPx;
+        phoneSidewaysOnly, kFg, kSoft, kPlaceholder, runtimeMinutes, TvCanvas, titleOf, episodeLine, sizeBucket, tvPx, EdgeFade;
 import 'images.dart' show netImage, LogoImage;
 import 'main.dart' show Jellyfin;
 import 'banners.dart' show showPartyNotice, showBanner, bannerIcon;
