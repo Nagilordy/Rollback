@@ -10,8 +10,7 @@ Rollback started over at 0.1 with its new name (it was called Frame). The earlie
 - **Start screen:** when Rollback takes a moment to start and reach your server, the Rollback
   mark breathes, with soft rings going out like a heartbeat, above "Connecting to" your
   server's name. A quick start goes straight to Home with no added wait.
-- **Picking a server:** the card you picked says "Connecting…"; if the server takes more than
-  a second (waking up, or far away), the pulsing Rollback screen takes over until it answers.
+- **Picking a server:** the card you picked says "Connecting…" while Rollback reaches it.
 
 ## 0.1 (pre-release, Linux)
 

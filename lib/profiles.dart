@@ -1192,7 +1192,6 @@ class _ServerScreenState extends State<ServerScreen> {
 
   @override
   void dispose() {
-    _slow?.cancel();
     _address.dispose();
     _cards.dispose();
     super.dispose();
@@ -1229,51 +1228,27 @@ class _ServerScreenState extends State<ServerScreen> {
   }
 
   // TV and PC, while a server is being reached: the card you picked says "Connecting…".
-  // If it takes more than a second (a NAS waking up, a server far away), the start screen's
-  // pulsing Rollback mark takes over with "Connecting to <server>", at least half a second.
   String? _pending; // the address being reached
-  String? _connectingTo; // set once the full screen is up
-  Timer? _slow;
-  final _splashSince = Stopwatch();
 
   Future<void> _connect(String text) async {
     final address = _normalize(text);
     if (address.isEmpty || _busy) return;
-    final known = [..._saved, ...?_found].where((s) => s.address == address);
-    final label = known.isNotEmpty ? known.first.name : (Uri.tryParse(address)?.host ?? address);
     setState(() {
       _busy = true;
       _error = null;
       _pending = address;
     });
-    _slow?.cancel();
-    _slow = Timer(const Duration(seconds: 1), () {
-      if (!mounted || _pending != address) return;
-      _splashSince
-        ..reset()
-        ..start();
-      setState(() => _connectingTo = label);
-    });
     try {
       final info = await Jellyfin(address).publicInfo();
-      final name = info['ServerName']?.toString();
-      await ProfileStore.setServer(address, name);
-      _slow?.cancel();
-      if (_connectingTo != null) {
-        if (name != null && mounted) setState(() => _connectingTo = name);
-        final left = const Duration(milliseconds: 500) - _splashSince.elapsed;
-        if (left > Duration.zero) await Future.delayed(left);
-      }
+      await ProfileStore.setServer(address, info['ServerName']?.toString());
       if (mounted) _openWho(context, address);
     } catch (e) {
       if (mounted) setState(() => _error = errorText(e));
     } finally {
-      _slow?.cancel();
       if (mounted) {
         setState(() {
           _busy = false;
           _pending = null;
-          _connectingTo = null;
         });
       }
     }
@@ -1337,7 +1312,6 @@ class _ServerScreenState extends State<ServerScreen> {
   @override
   Widget build(BuildContext context) {
     if (isPhone(context)) return _phoneBuild(context);
-    if (_connectingTo != null) return RollbackSplash(serverName: _connectingTo);
     final searching = _found == null;
     final found = _found ?? const <({String name, String address})>[];
     final first = widget.current == null; // Rollback's very first screen
