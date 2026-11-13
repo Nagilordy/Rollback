@@ -9,7 +9,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -1275,71 +1274,5 @@ class _MediaRowState extends State<_MediaRow> {
         ),
       ),
     );
-  }
-}
-
-/// Fades a card out softly where it reaches the left or right edge of its row, the way a
-/// gradient mask over the whole row would, but only for a card that actually overlaps an
-/// edge (usually one or two per row): every other card is drawn as is, with no extra layer.
-/// [edge] is the width of the fade, in the row's units.
-class EdgeFade extends SingleChildRenderObjectWidget {
-  const EdgeFade({super.key, required this.edge, super.child});
-  final double edge;
-
-  @override
-  RenderObject createRenderObject(BuildContext context) => _RenderEdgeFade(edge);
-
-  @override
-  void updateRenderObject(BuildContext context, _RenderEdgeFade renderObject) => renderObject.edge = edge;
-}
-
-class _RenderEdgeFade extends RenderProxyBox {
-  _RenderEdgeFade(this._edge);
-  double _edge;
-  set edge(double v) {
-    if (v == _edge) return;
-    _edge = v;
-    markNeedsPaint();
-  }
-
-  final _mask = LayerHandle<ShaderMaskLayer>();
-
-  @override
-  void paint(PaintingContext context, Offset offset) {
-    final viewport = RenderAbstractViewport.maybeOf(this);
-    final child = this.child;
-    if (child == null) return;
-    if (viewport is! RenderBox || !hasSize) {
-      _mask.layer = null;
-      context.paintChild(child, offset);
-      return;
-    }
-    final rowWidth = (viewport as RenderBox).size.width;
-    final left = localToGlobal(Offset.zero, ancestor: viewport).dx;
-    final right = left + size.width;
-    if (left >= _edge && right <= rowWidth - _edge) {
-      _mask.layer = null; // fully inside: no fade, no layer
-      context.paintChild(child, offset);
-      return;
-    }
-    // The row's fade, placed so it lines up with the row (this card's own coordinates).
-    final rowRect = Rect.fromLTWH(offset.dx - left, offset.dy, rowWidth, size.height);
-    final e = (_edge / rowWidth).clamp(0.0, 0.5);
-    final layer = _mask.layer ??= ShaderMaskLayer();
-    layer
-      ..shader = LinearGradient(
-        colors: const [Color(0x00FFFFFF), Color(0xFFFFFFFF), Color(0xFFFFFFFF), Color(0x00FFFFFF)],
-        stops: [0.0, e, 1 - e, 1.0],
-      ).createShader(rowRect)
-      // A little larger than the card, so its glow when selected fades with it.
-      ..maskRect = (offset & size).inflate(40)
-      ..blendMode = BlendMode.dstIn;
-    context.pushLayer(layer, (c, o) => c.paintChild(child, o), offset);
-  }
-
-  @override
-  void dispose() {
-    _mask.layer = null;
-    super.dispose();
   }
 }

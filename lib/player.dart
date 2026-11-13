@@ -1969,14 +1969,16 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                               _phoneBottomBar(),
                             ])
                           // PC and TV: hidden under the loading screen until the video is on.
+                          // (In its own drawing layer, so fading the controls in or out reuses
+                          // one finished picture instead of redrawing them all on every frame.)
                           : !_loaded
                               ? const SizedBox.shrink()
-                              : TvCanvas(
+                              : RepaintBoundary(child: TvCanvas(
                                   child: Stack(clipBehavior: Clip.none, children: [
                                     _tvTop(title, episodeLine),
                                     if (_panel == _Panel.none) _tvBar() else _tvSheet(),
                                   ]),
-                                ),
+                                )),
                 ),
               ),
             ),
@@ -3384,7 +3386,14 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       cacheExtent: 4000, // every card exists, so the chosen one can be selected
       itemCount: choices.length,
       separatorBuilder: (_, __) => const SizedBox(width: 24),
-      itemBuilder: (_, i) => _tvCard(choices[i], i == focusIdx ? _panelFirst : null),
+      // The row fades where there are more cards that way (see EdgeFade: only the cards at an
+      // edge get a layer, not the whole row).
+      addRepaintBoundaries: false,
+      itemBuilder: (_, i) => EdgeFade(
+        fraction: 0.06,
+        sides: _cardsEdges,
+        child: RepaintBoundary(child: _tvCard(choices[i], i == focusIdx ? _panelFirst : null)),
+      ),
     );
     Widget arrow(bool left) => Positioned(
           left: left ? 16 : null,
@@ -3438,21 +3447,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
               builder: (_, edges, list) {
                 final (moreLeft, moreRight) = edges;
                 return Stack(clipBehavior: Clip.none, children: [
-                  Positioned.fill(
-                    child: ShaderMask(
-                      blendMode: BlendMode.dstIn,
-                      shaderCallback: (r) => LinearGradient(
-                        colors: [
-                          moreLeft ? const Color(0x00000000) : const Color(0xFF000000),
-                          const Color(0xFF000000),
-                          const Color(0xFF000000),
-                          moreRight ? const Color(0x00000000) : const Color(0xFF000000),
-                        ],
-                        stops: const [0, 0.06, 0.94, 1],
-                      ).createShader(r),
-                      child: list,
-                    ),
-                  ),
+                  Positioned.fill(child: list!),
                   if (moreLeft) arrow(true),
                   if (moreRight) arrow(false),
                 ]);

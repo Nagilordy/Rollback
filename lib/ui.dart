@@ -6,6 +6,7 @@ import 'dart:io' show Platform;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:frame_video/frame_video.dart' show FrameVideo;
 import 'package:window_manager/window_manager.dart';
@@ -830,5 +831,119 @@ Future<void> warmUpDrawing() async {
     image.dispose();
   } catch (_) {
     // A warm-up that fails only means the first moves are a little slower, as before.
+  }
+}
+
+/// Fades a card out softly where it reaches the left or right edge of its row, the way a
+/// gradient mask over the whole row would, but only for a card that actually overlaps an
+/// edge (usually one or two per row): every other card is drawn as is, with no extra layer.
+/// (A mask over the whole row redrew it into a see-through layer the width of the screen on
+/// every frame a card moved: costly at 4K, above all on Windows.)
+///
+/// [edge] is the width of the fade in the row's units, or [fraction] of the row's width.
+/// [sides], if given, says whether each side fades right now (there's more to see that way);
+/// without it both sides always fade. Put a RepaintBoundary inside, around the card, and turn
+/// off the list's own boundaries (addRepaintBoundaries: false), so scrolling updates the fade.
+class EdgeFade extends SingleChildRenderObjectWidget {
+  const EdgeFade({super.key, this.edge = 0, this.fraction = 0, this.sides, super.child});
+  final double edge;
+  final double fraction;
+  final ValueListenable<(bool, bool)>? sides;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderEdgeFade(edge, fraction, sides);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderEdgeFade renderObject) => renderObject
+    ..edge = edge
+    ..fraction = fraction
+    ..sides = sides;
+}
+
+class _RenderEdgeFade extends RenderProxyBox {
+  _RenderEdgeFade(this._edge, this._fraction, this._sides);
+  double _edge, _fraction;
+  ValueListenable<(bool, bool)>? _sides;
+
+  set edge(double v) {
+    if (v == _edge) return;
+    _edge = v;
+    markNeedsPaint();
+  }
+
+  set fraction(double v) {
+    if (v == _fraction) return;
+    _fraction = v;
+    markNeedsPaint();
+  }
+
+  set sides(ValueListenable<(bool, bool)>? v) {
+    if (v == _sides) return;
+    if (attached) _sides?.removeListener(markNeedsPaint);
+    _sides = v;
+    if (attached) _sides?.addListener(markNeedsPaint);
+    markNeedsPaint();
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _sides?.addListener(markNeedsPaint);
+  }
+
+  @override
+  void detach() {
+    _sides?.removeListener(markNeedsPaint);
+    super.detach();
+  }
+
+  final _mask = LayerHandle<ShaderMaskLayer>();
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final child = this.child;
+    if (child == null) return;
+    final viewport = RenderAbstractViewport.maybeOf(this);
+    if (viewport is! RenderBox || !hasSize) {
+      _mask.layer = null;
+      context.paintChild(child, offset);
+      return;
+    }
+    final rowWidth = (viewport as RenderBox).size.width;
+    final fade = _edge > 0 ? _edge : _fraction * rowWidth;
+    final (leftOn, rightOn) = _sides?.value ?? (true, true);
+    final left = localToGlobal(Offset.zero, ancestor: viewport).dx;
+    final right = left + size.width;
+    final touchesLeft = leftOn && left < fade;
+    final touchesRight = rightOn && right > rowWidth - fade;
+    if (fade <= 0 || (!touchesLeft && !touchesRight)) {
+      _mask.layer = null; // no fade here: no layer
+      context.paintChild(child, offset);
+      return;
+    }
+    // The row's fade, placed so it lines up with the row (in this card's own coordinates).
+    final rowRect = Rect.fromLTWH(offset.dx - left, offset.dy, rowWidth, size.height);
+    final e = (fade / rowWidth).clamp(0.0, 0.5);
+    final layer = _mask.layer ??= ShaderMaskLayer();
+    layer
+      ..shader = LinearGradient(
+        colors: [
+          leftOn ? const Color(0x00FFFFFF) : const Color(0xFFFFFFFF),
+          const Color(0xFFFFFFFF),
+          const Color(0xFFFFFFFF),
+          rightOn ? const Color(0x00FFFFFF) : const Color(0xFFFFFFFF),
+        ],
+        stops: [0.0, e, 1 - e, 1.0],
+      ).createShader(rowRect)
+      // A little larger than the card, so its glow when selected fades with it.
+      ..maskRect = (offset & size).inflate(40)
+      ..blendMode = BlendMode.dstIn;
+    context.pushLayer(layer, (c, o) => c.paintChild(child, o), offset);
+  }
+
+  @override
+  void dispose() {
+    _mask.layer = null;
+    super.dispose();
   }
 }
