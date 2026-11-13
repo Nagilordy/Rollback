@@ -108,10 +108,12 @@ enum _Panel { none, playback, audio, subtitles, info }
 /// Loads the video engine (libmpv) the first time a video opens. It used to load while
 /// Rollback started, which made every start slower for something only the player needs.
 bool _videoEngineReady = false;
-void ensureVideoEngine() {
-  if (_videoEngineReady) return;
-  MediaKit.ensureInitialized();
-  _videoEngineReady = true;
+bool ensureVideoEngine() {
+  if (!_videoEngineReady) {
+    MediaKit.ensureInitialized();
+    _videoEngineReady = true;
+  }
+  return true;
 }
 
 class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver {
