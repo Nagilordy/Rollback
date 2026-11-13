@@ -1377,6 +1377,7 @@ class _ShowScreenState extends State<ShowScreen> {
   }
 
   Future<void> _loadEpisodes() async {
+    if (!mounted) return; // the show page was closed while it was still loading
     if (_seasons.isEmpty) {
       setState(() => _loading = false);
       return;

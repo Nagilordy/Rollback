@@ -67,6 +67,10 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
 - **Opening screens is lighter at 4K:** a new screen now comes up out of a dark veil instead of
   fading the whole screen, which redrew it into a see-through layer on every frame. Going back
   is instant.
+- **Closing Rollback never waits on the controllers (Windows):** the controller reader isn't
+  waited for when the app closes (Windows can take seconds to answer while it looks for
+  controllers), and its shared data stays valid until the very end, so closing can't hang or
+  crash on it. Closing a show page while it's still loading no longer touches the closed page.
 - **Crash and error logs (Windows):** if Rollback crashes, crash-<date>.log (what crashed and
   where) and a small crash dump are written to the logs folder, and errors Rollback runs into
   go to errors-<date>.log. Nothing is sent anywhere; they're there to send along with a report.

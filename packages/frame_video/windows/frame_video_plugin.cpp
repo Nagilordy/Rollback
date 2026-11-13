@@ -318,8 +318,10 @@ struct PadEvent {
   bool gone;
   PadState state;
 };
-static std::mutex g_pad_mutex;
-static std::vector<PadEvent> g_pad_events;  // waiting for the main thread
+// (Made once and never destroyed: the controller thread isn't waited for when Rollback closes,
+// so these must still exist if it does one last round while the app is shutting down.)
+static std::mutex& g_pad_mutex = *new std::mutex;
+static std::vector<PadEvent>& g_pad_events = *new std::vector<PadEvent>;  // waiting for the main thread
 static std::atomic<bool> g_pad_run{false};
 static std::atomic<bool> g_pad_rescan{true};
 static std::thread g_pad_thread;
@@ -412,9 +414,12 @@ class FrameVideoPlugin : public flutter::Plugin {
         });
   }
   ~FrameVideoPlugin() override {
+    // The controller thread stops on its own at its next check. It isn't waited for: Windows
+    // can take seconds to answer while it looks for controllers, and closing Rollback must not
+    // hang on that. (It only touches its own data and posts to a window that's going away.)
     g_pad_window = nullptr;
     g_pad_run = false;
-    if (g_pad_thread.joinable()) g_pad_thread.join();
+    if (g_pad_thread.joinable()) g_pad_thread.detach();
     registrar_->UnregisterTopLevelWindowProcDelegate(proc_id_);
     Close();
   }
