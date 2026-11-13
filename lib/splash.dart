@@ -155,3 +155,45 @@ class RollbackMarkPainter extends CustomPainter {
   @override
   bool shouldRepaint(RollbackMarkPainter old) => false;
 }
+
+/// Three small dots that light up one after another: "still working on it". Used after
+/// "Connecting" on a server card.
+class ConnectingDots extends StatefulWidget {
+  const ConnectingDots({super.key, required this.color, this.size = 6});
+  final Color color;
+  final double size;
+
+  @override
+  State<ConnectingDots> createState() => _ConnectingDotsState();
+}
+
+class _ConnectingDotsState extends State<ConnectingDots> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, __) => Row(mainAxisSize: MainAxisSize.min, children: [
+            for (var i = 0; i < 3; i++) ...[
+              if (i > 0) SizedBox(width: widget.size * 0.8),
+              Container(
+                width: widget.size,
+                height: widget.size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: widget.color.withOpacity(_RollbackSplashState._dotOpacity(_c.value, i)),
+                ),
+              ),
+            ],
+          ]),
+        ),
+      );
+}

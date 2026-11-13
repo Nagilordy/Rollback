@@ -403,17 +403,34 @@ class StartScreen extends StatefulWidget {
 
 class _StartScreenState extends State<StartScreen> {
   String? _serverName;
-  final _shown = Stopwatch()..start();
+  // The pulsing mark only when starting takes a while: it appears after a third of a second,
+  // and once it's up it stays at least half a second, so it never just flashes. A quick start
+  // goes straight on, with no waiting added.
+  bool _splash = false;
+  final _splashSince = Stopwatch();
+  Timer? _splashTimer;
 
   @override
   void initState() {
     super.initState();
+    _splashTimer = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      _splashSince.start();
+      setState(() => _splash = true);
+    });
     _decide();
   }
 
-  // The pulsing mark stays at least one breath (0.9 s), so it never just flickers on and off.
+  @override
+  void dispose() {
+    _splashTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _afterOneBeat() async {
-    final left = const Duration(milliseconds: 900) - _shown.elapsed;
+    _splashTimer?.cancel();
+    if (!_splash) return;
+    final left = const Duration(milliseconds: 500) - _splashSince.elapsed;
     if (left > Duration.zero) await Future.delayed(left);
   }
 
@@ -482,7 +499,8 @@ class _StartScreenState extends State<StartScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => RollbackSplash(serverName: _serverName);
+  Widget build(BuildContext context) =>
+      _splash ? RollbackSplash(serverName: _serverName) : const ColoredBox(color: kBg);
 }
 
 // ---------- Who's watching ----------
@@ -1174,6 +1192,7 @@ class _ServerScreenState extends State<ServerScreen> {
 
   @override
   void dispose() {
+    _slow?.cancel();
     _address.dispose();
     _cards.dispose();
     super.dispose();
@@ -1209,34 +1228,51 @@ class _ServerScreenState extends State<ServerScreen> {
     if (list.isNotEmpty) WidgetsBinding.instance.addPostFrameCallback((_) => focusOn(_cards[0]));
   }
 
-  // TV and PC: while a server is being reached, the start screen's pulsing Rollback mark with
-  // "Connecting to <server>" (at least one breath, 0.9 s, so it never just flickers).
-  String? _connectingTo;
+  // TV and PC, while a server is being reached: the card you picked says "Connecting…".
+  // If it takes more than a second (a NAS waking up, a server far away), the start screen's
+  // pulsing Rollback mark takes over with "Connecting to <server>", at least half a second.
+  String? _pending; // the address being reached
+  String? _connectingTo; // set once the full screen is up
+  Timer? _slow;
+  final _splashSince = Stopwatch();
 
   Future<void> _connect(String text) async {
     final address = _normalize(text);
     if (address.isEmpty || _busy) return;
     final known = [..._saved, ...?_found].where((s) => s.address == address);
-    final shown = Stopwatch()..start();
+    final label = known.isNotEmpty ? known.first.name : (Uri.tryParse(address)?.host ?? address);
     setState(() {
       _busy = true;
       _error = null;
-      _connectingTo = known.isNotEmpty ? known.first.name : (Uri.tryParse(address)?.host ?? address);
+      _pending = address;
+    });
+    _slow?.cancel();
+    _slow = Timer(const Duration(seconds: 1), () {
+      if (!mounted || _pending != address) return;
+      _splashSince
+        ..reset()
+        ..start();
+      setState(() => _connectingTo = label);
     });
     try {
       final info = await Jellyfin(address).publicInfo();
       final name = info['ServerName']?.toString();
-      if (name != null && mounted) setState(() => _connectingTo = name);
       await ProfileStore.setServer(address, name);
-      final left = const Duration(milliseconds: 900) - shown.elapsed;
-      if (left > Duration.zero) await Future.delayed(left);
+      _slow?.cancel();
+      if (_connectingTo != null) {
+        if (name != null && mounted) setState(() => _connectingTo = name);
+        final left = const Duration(milliseconds: 500) - _splashSince.elapsed;
+        if (left > Duration.zero) await Future.delayed(left);
+      }
       if (mounted) _openWho(context, address);
     } catch (e) {
       if (mounted) setState(() => _error = errorText(e));
     } finally {
+      _slow?.cancel();
       if (mounted) {
         setState(() {
           _busy = false;
+          _pending = null;
           _connectingTo = null;
         });
       }
@@ -1266,7 +1302,17 @@ class _ServerScreenState extends State<ServerScreen> {
               Row(children: [
                 Icon(Icons.dns_outlined, size: 46, color: f ? kBg : kFg),
                 const Spacer(),
-                if (current)
+                if (_pending == server.address)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(color: f ? kBg : kFg, borderRadius: BorderRadius.circular(999)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text('Connecting', style: tvBody(18, weight: FontWeight.w700, color: f ? kFg : kBg)),
+                      const SizedBox(width: 8),
+                      ConnectingDots(color: f ? kFg : kBg, size: 5),
+                    ]),
+                  )
+                else if (current)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(color: f ? kBg : kFg, borderRadius: BorderRadius.circular(999)),
