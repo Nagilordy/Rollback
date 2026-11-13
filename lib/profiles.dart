@@ -1209,21 +1209,37 @@ class _ServerScreenState extends State<ServerScreen> {
     if (list.isNotEmpty) WidgetsBinding.instance.addPostFrameCallback((_) => focusOn(_cards[0]));
   }
 
+  // TV and PC: while a server is being reached, the start screen's pulsing Rollback mark with
+  // "Connecting to <server>" (at least one breath, 0.9 s, so it never just flickers).
+  String? _connectingTo;
+
   Future<void> _connect(String text) async {
     final address = _normalize(text);
     if (address.isEmpty || _busy) return;
+    final known = [..._saved, ...?_found].where((s) => s.address == address);
+    final shown = Stopwatch()..start();
     setState(() {
       _busy = true;
       _error = null;
+      _connectingTo = known.isNotEmpty ? known.first.name : (Uri.tryParse(address)?.host ?? address);
     });
     try {
       final info = await Jellyfin(address).publicInfo();
-      await ProfileStore.setServer(address, info['ServerName']?.toString());
+      final name = info['ServerName']?.toString();
+      if (name != null && mounted) setState(() => _connectingTo = name);
+      await ProfileStore.setServer(address, name);
+      final left = const Duration(milliseconds: 900) - shown.elapsed;
+      if (left > Duration.zero) await Future.delayed(left);
       if (mounted) _openWho(context, address);
     } catch (e) {
       if (mounted) setState(() => _error = errorText(e));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _connectingTo = null;
+        });
+      }
     }
   }
 
@@ -1275,6 +1291,7 @@ class _ServerScreenState extends State<ServerScreen> {
   @override
   Widget build(BuildContext context) {
     if (isPhone(context)) return _phoneBuild(context);
+    if (_connectingTo != null) return RollbackSplash(serverName: _connectingTo);
     final searching = _found == null;
     final found = _found ?? const <({String name, String address})>[];
     final first = widget.current == null; // Rollback's very first screen

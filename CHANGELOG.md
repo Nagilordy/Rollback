@@ -9,7 +9,8 @@ Rollback started over at 0.1 with its new name (it was called Frame). The earlie
 
 - **Start screen:** while Rollback starts and reaches your server, the Rollback mark breathes,
   with soft rings going out like a heartbeat, above "Connecting to" your server's name. It
-  stays at least one breath, then fades into Home.
+  stays at least one breath, then fades into Home. The same screen shows while Rollback
+  connects to a server you pick on the server screen.
 
 ## 0.1 (pre-release, Linux)
 
