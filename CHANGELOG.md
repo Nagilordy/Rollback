@@ -43,8 +43,11 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
 ### Windows
 - **Video decoded by the graphics card stays there** (the engine is built for it; still being
   checked: the log should say `d3d11va`, not `d3d11va-copy`).
-- **The title bar:** leaving full screen no longer leaves the old "Windows Basic" one, even when
-  switching quickly (changes now happen one at a time).
+- **Full screen in one step:** Rollback switches with its own window code, in a single move to
+  the screen's size and back, instead of passing through several in-between sizes. Quicker, and
+  the old "Windows Basic" title bar can't come back.
+- **Smoother resizing:** while the window changes size, the backdrop shading is stretched from
+  the picture already made instead of being drawn live on every frame.
 - **Resizing and full screen:** pictures are decoded at the new size once the window has
   settled, not at every step of the change.
 - **Sound:** a little more kept ready, so Bluetooth headphones and short stalls don't crackle.

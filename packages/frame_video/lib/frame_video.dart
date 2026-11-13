@@ -37,6 +37,17 @@ class FrameVideo {
 
   /// Windows: makes Windows redraw the title bar after leaving full screen (otherwise it can
   /// fall back to the old "Windows Basic" frame).
+  /// Windows: full screen on or off in one step (see frame_video_plugin.cpp). False when it
+  /// couldn't (then the caller falls back to window_manager).
+  static Future<bool> setFullScreen(bool on) async {
+    if (!Platform.isWindows) return false;
+    try {
+      return await _channel.invokeMethod<bool>('setFullScreen', on) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<void> refreshFrame() async {
     if (!Platform.isWindows) return;
     try {

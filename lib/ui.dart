@@ -37,22 +37,30 @@ Future<void> setFullScreen(bool on) {
 Future<void> _applyFullScreen() async {
   final on = fullScreen.value; // the latest wish, if several came in meanwhile
   try {
+    // Windows: in one step, with Rollback's own window code (see frame_video_plugin.cpp).
+    if (Platform.isWindows) {
+      if (on == _windowsFullScreen) return;
+      if (await FrameVideo.setFullScreen(on)) {
+        _windowsFullScreen = on;
+        return;
+      }
+    }
     if (await windowManager.isFullScreen() == on) return;
     await windowManager.setFullScreen(on);
-    if (!on) {
-      // Windows: leaving full screen can leave the old "Windows Basic" title bar; redraw the
-      // frame now and once more when Windows has finished restyling the window.
+    if (!on && Platform.isWindows) {
+      // window_manager can leave the old "Windows Basic" title bar; redraw the frame now and
+      // once more when Windows has finished restyling the window.
       await FrameVideo.refreshFrame();
       await Future.delayed(const Duration(milliseconds: 250));
       await FrameVideo.refreshFrame();
     }
-    final actual = await windowManager.isFullScreen();
-    debugPrint('Full screen: asked ${on ? 'on' : 'off'}, window is ${actual ? 'full screen' : 'not full screen'}');
   } catch (e) {
     fullScreen.value = !on;
     debugPrint('Full screen failed: $e');
   }
 }
+
+bool _windowsFullScreen = false;
 
 // ---------- Colors and text ----------
 

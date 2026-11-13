@@ -790,6 +790,18 @@ class _ShadeOverlayState extends State<ShadeOverlay> {
               );
             }
             _bakeShades(key, widget.shades, px);
+            // While the window changes size (dragging an edge, full screen on or off), the last
+            // picture is stretched to fit: no steps can be seen while things move, and drawing
+            // the gradients live here was what made resizing heavy. The exact picture follows
+            // half a second after the size settles.
+            if (baked != null) {
+              return RawImage(
+                image: baked.image,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.low,
+                opacity: widget.opacity >= 1 ? null : AlwaysStoppedAnimation(widget.opacity),
+              );
+            }
             final live = Stack(fit: StackFit.expand, children: [
               for (final s in widget.shades) DecoratedBox(decoration: BoxDecoration(gradient: s)),
             ]);

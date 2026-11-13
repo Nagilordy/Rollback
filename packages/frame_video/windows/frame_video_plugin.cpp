@@ -157,6 +157,40 @@ void Close() {
                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 }
 
+// ---------- Full screen in one step ----------
+//
+// window_manager changes the window's style, size and position one after another, so going full
+// screen passed through several in-between sizes (each one a full relayout and frame in Rollback:
+// slow, and it could leave the old "Windows Basic" title bar). This is the classic borderless
+// full screen: the frame's style is dropped and the window covers its monitor in one move; back,
+// the style and the saved placement come back in one move. Windows also treats a borderless
+// window covering the screen as full screen (no desktop composition in between).
+static WINDOWPLACEMENT g_placement = {sizeof(WINDOWPLACEMENT)};
+static LONG_PTR g_windowed_style = 0;
+static bool g_full_screen = false;
+
+static bool SetFullScreen(HWND frame, bool on) {
+  if (on == g_full_screen) return true;
+  if (on) {
+    MONITORINFO mi = {sizeof(mi)};
+    if (!GetWindowPlacement(frame, &g_placement) ||
+        !GetMonitorInfo(MonitorFromWindow(frame, MONITOR_DEFAULTTONEAREST), &mi)) {
+      return false;
+    }
+    g_windowed_style = GetWindowLongPtr(frame, GWL_STYLE);
+    SetWindowLongPtr(frame, GWL_STYLE, g_windowed_style & ~WS_OVERLAPPEDWINDOW);
+    SetWindowPos(frame, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left,
+                 mi.rcMonitor.bottom - mi.rcMonitor.top, SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+  } else {
+    SetWindowLongPtr(frame, GWL_STYLE, g_windowed_style ? g_windowed_style : (GetWindowLongPtr(frame, GWL_STYLE) | WS_OVERLAPPEDWINDOW));
+    SetWindowPlacement(frame, &g_placement);
+    SetWindowPos(frame, nullptr, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+  }
+  g_full_screen = on;
+  return true;
+}
+
 class FrameVideoPlugin : public flutter::Plugin {
  public:
   explicit FrameVideoPlugin(flutter::PluginRegistrarWindows* registrar) : registrar_(registrar) {
@@ -180,6 +214,11 @@ class FrameVideoPlugin : public flutter::Plugin {
     } else if (call.method_name() == "close") {
       Close();
       result->Success();
+    } else if (call.method_name() == "setFullScreen") {
+      const auto* on = std::get_if<bool>(call.arguments());
+      HWND view = registrar_->GetView() ? registrar_->GetView()->GetNativeWindow() : nullptr;
+      HWND frame = view ? GetAncestor(view, GA_ROOT) : nullptr;
+      result->Success(flutter::EncodableValue(frame && on && SetFullScreen(frame, *on)));
     } else if (call.method_name() == "refreshFrame") {
       // After leaving full screen, window_manager puts the title bar's style back but doesn't
       // tell Windows the frame changed (no SWP_FRAMECHANGED when the window isn't maximised),
