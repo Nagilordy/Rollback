@@ -5,6 +5,12 @@ What changed in each version of Rollback. Newest first.
 Rollback started over at 0.1 with its new name (it was called Frame). The earlier test versions,
 0.2 and 0.3, were previews and are no longer listed here.
 
+## 0.1.1 (in progress, Linux)
+
+- **Start screen:** while Rollback starts and reaches your server, the Rollback mark breathes,
+  with soft rings going out like a heartbeat, above "Connecting to" your server's name. It
+  stays at least one breath, then fades into Home.
+
 ## 0.1 (pre-release, Linux)
 
 The first version of Rollback: a couch-first app for Jellyfin, made for a controller and just as

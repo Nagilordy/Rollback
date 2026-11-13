@@ -21,6 +21,7 @@ import 'images.dart' show netImage;
 import 'keyboard.dart' show TvTextField;
 import 'main.dart' show Jellyfin;
 import 'phone.dart';
+import 'splash.dart';
 import 'syncplay.dart' show SyncPlay, showPartyMenu, showStartParty;
 import 'ui.dart';
 
@@ -401,10 +402,19 @@ class StartScreen extends StatefulWidget {
 }
 
 class _StartScreenState extends State<StartScreen> {
+  String? _serverName;
+  final _shown = Stopwatch()..start();
+
   @override
   void initState() {
     super.initState();
     _decide();
+  }
+
+  // The pulsing mark stays at least one breath (0.9 s), so it never just flickers on and off.
+  Future<void> _afterOneBeat() async {
+    final left = const Duration(milliseconds: 900) - _shown.elapsed;
+    if (left > Duration.zero) await Future.delayed(left);
   }
 
   Future<void> _decide() async {
@@ -413,6 +423,10 @@ class _StartScreenState extends State<StartScreen> {
     String? last;
     try {
       server = await ProfileStore.server();
+      if (server != null) {
+        final name = await ProfileStore.serverName(server);
+        if (mounted) setState(() => _serverName = name);
+      }
       saved = await ProfileStore.profiles();
       last = await ProfileStore.lastUser();
     } catch (_) {}
@@ -456,15 +470,19 @@ class _StartScreenState extends State<StartScreen> {
         jf.userName = user['Name']?.toString();
         jf.userImageTag = user['PrimaryImageTag']?.toString();
       }
+      await _afterOneBeat();
+      if (!mounted) return;
       _openHome(context, jf);
       return;
     }
+    await _afterOneBeat();
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => WhoScreen(server: server!, initialUsers: public)));
   }
 
   @override
-  Widget build(BuildContext context) => const ColoredBox(color: kBg);
+  Widget build(BuildContext context) => RollbackSplash(serverName: _serverName);
 }
 
 // ---------- Who's watching ----------
