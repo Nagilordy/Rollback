@@ -7,6 +7,9 @@
 // LICENSE file.
 #include "angle_surface_manager.h"
 
+#include <cstdio>
+#include <cstring>
+
 #include <iostream>
 
 #pragma comment(lib, "dxgi.lib")
@@ -21,6 +24,28 @@
   if (FAILED(hr)) {            \
     FAIL(message);             \
   }
+
+
+// Rollback: one line about how the picture is set up, in %APPDATA%\Rollback\logs\video-<date>.log
+// (whether ANGLE runs on Rollback's own Direct3D device, which video decoded by the graphics
+// card needs to go straight to the picture). Nothing else is written.
+static void RollbackVideoLog(const char* message) {
+  char folder[MAX_PATH] = "";
+  DWORD n = ::GetEnvironmentVariableA("APPDATA", folder, MAX_PATH);
+  if (n == 0 || n >= MAX_PATH - 40) return;
+  strcat_s(folder, "\\Rollback\\logs");
+  ::CreateDirectoryA(folder, nullptr);
+  SYSTEMTIME t;
+  ::GetLocalTime(&t);
+  char path[MAX_PATH];
+  sprintf_s(path, "%s\\video-%04u-%02u-%02u.log", folder, t.wYear, t.wMonth, t.wDay);
+  FILE* file = nullptr;
+  if (fopen_s(&file, path, "a") == 0 && file) {
+    fprintf(file, "%04u-%02u-%02u %02u:%02u:%02u  %s\n", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute,
+            t.wSecond, message);
+    fclose(file);
+  }
+}
 
 int ANGLESurfaceManager::instance_count_ = 0;
 
@@ -190,6 +215,7 @@ bool ANGLESurfaceManager::CreateD3DTexture() {
         D3D11_CREATE_DEVICE_VIDEO_SUPPORT | D3D11_CREATE_DEVICE_BGRA_SUPPORT,
         feature_levels.begin(), static_cast<UINT>(feature_levels.size()),
         D3D11_SDK_VERSION, &d3d_11_device_, 0, &d3d_11_device_context_);
+    bool video_support = SUCCEEDED(hr);
     if (FAILED(hr)) {
       hr = ::D3D11CreateDevice(
           adapter, driver_type, 0, 0, feature_levels.begin(),
@@ -197,6 +223,8 @@ bool ANGLESurfaceManager::CreateD3DTexture() {
           &d3d_11_device_, 0, &d3d_11_device_context_);
     }
     CHECK_HRESULT("D3D11CreateDevice");
+    RollbackVideoLog(video_support ? "Direct3D device made with video support"
+                                   : "Direct3D device made WITHOUT video support (the graphics driver refused it)");
     // The device is shared with the video decoder's threads.
     Microsoft::WRL::ComPtr<ID3D10Multithread> multithread;
     if (SUCCEEDED(d3d_11_device_->QueryInterface(IID_PPV_ARGS(&multithread)))) {
@@ -272,6 +300,11 @@ bool ANGLESurfaceManager::CreateEGLDisplay() {
     using CreateDeviceANGLE = void*(EGLAPIENTRY*)(EGLint, void*, const EGLAttrib*);
     auto eglCreateDeviceANGLE =
         reinterpret_cast<CreateDeviceANGLE>(eglGetProcAddress("eglCreateDeviceANGLE"));
+    if (!eglCreateDeviceANGLE) {
+      RollbackVideoLog("ANGLE can't use an outside Direct3D device (no eglCreateDeviceANGLE): it makes its own");
+    } else if (!d3d_11_device_) {
+      RollbackVideoLog("No Direct3D device of Rollback's to give ANGLE: it makes its own");
+    }
     if (eglGetPlatformDisplayEXT && eglCreateDeviceANGLE && d3d_11_device_) {
       void* device = eglCreateDeviceANGLE(0x33A1 /* EGL_D3D11_DEVICE_ANGLE */,
                                           d3d_11_device_, nullptr);
@@ -280,15 +313,19 @@ bool ANGLESurfaceManager::CreateEGLDisplay() {
         if (display_ != EGL_NO_DISPLAY && eglInitialize(display_, 0, 0) == EGL_TRUE) {
           egl_device_ = device;
           own_display_ = true;
+          RollbackVideoLog("ANGLE runs on Rollback's Direct3D device (d3d11va can go straight to the picture)");
           std::cout << "media_kit: ANGLESurfaceManager: ANGLE on the app's Direct3D device "
                        "(video decoding can stay on the graphics card)."
                     << std::endl;
           return true;
         }
+        RollbackVideoLog("ANGLE couldn't start on Rollback's Direct3D device: it makes its own");
         display_ = EGL_NO_DISPLAY;
         using ReleaseDeviceANGLE = EGLBoolean(EGLAPIENTRY*)(void*);
         auto release = reinterpret_cast<ReleaseDeviceANGLE>(eglGetProcAddress("eglReleaseDeviceANGLE"));
         if (release) release(device);
+      } else {
+        RollbackVideoLog("ANGLE refused Rollback's Direct3D device (eglCreateDeviceANGLE failed): it makes its own");
       }
     }
     if (eglGetPlatformDisplayEXT) {

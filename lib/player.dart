@@ -992,19 +992,26 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   }
   int get _ticksNow => player.state.position.inMicroseconds * 10;
 
-  void _startEngineLog() {
+  // The picture (and with it the engine's drawing setup, where it decides d3d11va or the copy)
+  // only starts once the engine log is open, so the log shows that decision.
+  bool _engineLogged = !Platform.isWindows;
+  late final Future<void> _engineLogReady = Platform.isWindows ? _startEngineLog() : Future.value();
+
+  Future<void> _startEngineLog() async {
     final mpv = player.platform;
-    if (mpv is! NativePlayer) return;
     try {
-      final now = DateTime.now();
-      final day = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-      Directory(AppLog.folder).createSync(recursive: true);
-      mpv.setProperty('msg-level', 'all=info,vd=v,hwdec=v,vo=v,libmpv_render=v,libmpv_gpu=v').catchError((_) {});
-      mpv.setProperty('log-file', '${AppLog.folder}\\mpv-$day.log').catchError((_) {});
-      Timer(const Duration(seconds: 45), () {
-        if (mounted) mpv.setProperty('log-file', '').catchError((_) {});
-      });
+      if (mpv is NativePlayer) {
+        final now = DateTime.now();
+        final day = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+        Directory(AppLog.folder).createSync(recursive: true);
+        await mpv.setProperty('msg-level', 'all=info,vd=v,hwdec=v,vo=v,libmpv_render=v,libmpv_gpu=v');
+        await mpv.setProperty('log-file', '${AppLog.folder}\\mpv-$day.log');
+        Timer(const Duration(seconds: 45), () {
+          if (mounted) mpv.setProperty('log-file', '').catchError((_) {});
+        });
+      }
     } catch (_) {}
+    if (mounted && !_engineLogged) setState(() => _engineLogged = true);
   }
 
   @override
@@ -1014,7 +1021,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     // Windows: the engine's own log, from before the picture is set up (that's when it decides
     // whether frames decoded by the graphics card can go straight to the picture, d3d11va, or
     // need a copy, d3d11va-copy) until 30 seconds into the video: mpv-<date>.log beside the perf log.
-    if (Platform.isWindows) _startEngineLog();
+    if (Platform.isWindows) unawaited(_engineLogReady);
     // Phones: video always plays sideways (the screen it came from sets its own again on return).
     if (_phone) phoneSidewaysOnly();
     if (_phone) {
@@ -1095,6 +1102,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   // draw ("No render context set": sound and time run, but no picture, on iPhone). The
   // controller is created here (it's lazy) and playback starts once it's ready.
   Future<void> _startWhenVideoReady() async {
+    await _engineLogReady.timeout(const Duration(seconds: 3), onTimeout: () {
+      if (mounted && !_engineLogged) setState(() => _engineLogged = true);
+    });
     if (_hdrLayer) {
       _subs.add(player.stream.log.listen((l) => debugPrint('Player mpv: [${l.level}] ${l.prefix}: ${l.text.trim()}')));
       final mpv = player.platform;
@@ -1977,7 +1987,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   }
 
   // The video itself, with no built-in controls. Pinch on a phone fills the screen.
-  Widget _video() => _surface
+  Widget _video() => _surface || !_engineLogged
       ? const SizedBox.expand()
       : Video(
         controller: controller,
