@@ -44,8 +44,9 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
 - **Video decoded by the graphics card stays there** (the engine is built for it; still being
   checked: the log should say `d3d11va`, not `d3d11va-copy`).
 - **Full screen in one step:** Rollback switches with its own window code, in a single move to
-  the screen's size and back, instead of passing through several in-between sizes. Quicker, and
-  the old "Windows Basic" title bar can't come back.
+  the screen's size and back, instead of passing through several in-between sizes. The window
+  keeps its Windows 11 title bar and style the whole time (only hidden while in full screen), so
+  the old "Windows Basic" title bar no longer flashes when switching.
 - **Smoother resizing:** while the window changes size, the backdrop shading is stretched from
   the picture already made instead of being drawn live on every frame.
 - **Resizing and full screen:** pictures are decoded at the new size once the window has

@@ -21,6 +21,7 @@
 #include <commctrl.h>
 #include <dwmapi.h>
 #include <windows.h>
+#include <shobjidl.h>
 
 #include <memory>
 
@@ -159,15 +160,37 @@ void Close() {
 
 // ---------- Full screen in one step ----------
 //
-// window_manager changes the window's style, size and position one after another, so going full
-// screen passed through several in-between sizes (each one a full relayout and frame in Rollback:
-// slow, and it could leave the old "Windows Basic" title bar). This is the classic borderless
-// full screen: the frame's style is dropped and the window covers its monitor in one move; back,
-// the style and the saved placement come back in one move. Windows also treats a borderless
-// window covering the screen as full screen (no desktop composition in between).
+// The window keeps its normal Windows 11 style the whole time: its style is never changed, since
+// changing it made Windows briefly draw the old "Windows Basic" title bar. In full screen the
+// window covers its monitor and tells Windows it has no title bar or border (WM_NCCALCSIZE: the
+// whole window is Rollback's), without square-corner or border lines from Windows 11, and the
+// taskbar is told it's a full-screen window. Back, the saved place and size come back in one move,
+// with the native title bar exactly as it was.
 static WINDOWPLACEMENT g_placement = {sizeof(WINDOWPLACEMENT)};
-static LONG_PTR g_windowed_style = 0;
 static bool g_full_screen = false;
+const UINT_PTR kFullScreenSubclassId = 0xF7A3F;
+
+static LRESULT CALLBACK FullScreenSubclass(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam, UINT_PTR, DWORD_PTR) {
+  if (msg == WM_NCCALCSIZE && wparam && g_full_screen) return 0;  // no title bar or border
+  return DefSubclassProc(hwnd, msg, wparam, lparam);
+}
+
+static void MarkTaskbarFullScreen(HWND frame, bool on) {
+  ITaskbarList2* taskbar = nullptr;
+  if (SUCCEEDED(CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&taskbar)))) {
+    if (SUCCEEDED(taskbar->HrInit())) taskbar->MarkFullscreenWindow(frame, on ? TRUE : FALSE);
+    taskbar->Release();
+  }
+}
+
+static void SetWindows11Edges(HWND frame, bool full_screen) {
+  // 33 = DWMWA_WINDOW_CORNER_PREFERENCE (1 = square, 0 = default); 34 = DWMWA_BORDER_COLOR
+  // (0xFFFFFFFE = none, 0xFFFFFFFF = default). Older Windows ignores these.
+  DWORD corners = full_screen ? 1 : 0;
+  DwmSetWindowAttribute(frame, 33, &corners, sizeof(corners));
+  DWORD border = full_screen ? 0xFFFFFFFE : 0xFFFFFFFF;
+  DwmSetWindowAttribute(frame, 34, &border, sizeof(border));
+}
 
 static bool SetFullScreen(HWND frame, bool on) {
   if (on == g_full_screen) return true;
@@ -177,17 +200,21 @@ static bool SetFullScreen(HWND frame, bool on) {
         !GetMonitorInfo(MonitorFromWindow(frame, MONITOR_DEFAULTTONEAREST), &mi)) {
       return false;
     }
-    g_windowed_style = GetWindowLongPtr(frame, GWL_STYLE);
-    SetWindowLongPtr(frame, GWL_STYLE, g_windowed_style & ~WS_OVERLAPPEDWINDOW);
+    SetWindowSubclass(frame, FullScreenSubclass, kFullScreenSubclassId, 0);
+    g_full_screen = true;
+    SetWindows11Edges(frame, true);
     SetWindowPos(frame, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left,
                  mi.rcMonitor.bottom - mi.rcMonitor.top, SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    MarkTaskbarFullScreen(frame, true);
   } else {
-    SetWindowLongPtr(frame, GWL_STYLE, g_windowed_style ? g_windowed_style : (GetWindowLongPtr(frame, GWL_STYLE) | WS_OVERLAPPEDWINDOW));
+    g_full_screen = false;
+    MarkTaskbarFullScreen(frame, false);
+    SetWindows11Edges(frame, false);
     SetWindowPlacement(frame, &g_placement);
     SetWindowPos(frame, nullptr, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    RemoveWindowSubclass(frame, FullScreenSubclass, kFullScreenSubclassId);
   }
-  g_full_screen = on;
   return true;
 }
 
