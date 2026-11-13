@@ -41,6 +41,10 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   layer, so selecting one no longer redraws the row.
 
 ### Windows
+- **Faster start:** the video engine (the biggest part of Rollback) is now loaded the first
+  time a video opens instead of every time Rollback starts, and the window and this device's
+  saved details are got ready at the same time instead of one after the other. The perf log
+  now says how long Home took to show ("Home shown … ms after start").
 - **Moving around Home is much lighter, above all at 4K and in a window:** the soft fade at the
   ends of each row used to redraw the whole row into a see-through layer on every frame a
   card moved. Now only the one or two cards at an edge are faded, each on its own.

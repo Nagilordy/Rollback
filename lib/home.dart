@@ -17,6 +17,7 @@ import 'main.dart';
 import 'library.dart';
 import 'movie.dart' show MovieScreen;
 import 'images.dart';
+import 'perf.dart' show AppLog, perfLog;
 import 'phone.dart';
 import 'downloads.dart' show Downloads, DownloadsScreen;
 import 'profiles.dart' show ProfileChip, ProfileStore, WhoScreen, showProfileMenu, accentFor;
@@ -379,8 +380,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Start-up time, for the perf log: when Home first shows its rows (saved or fresh).
+  static bool _shownLogged = false;
+
   @override
   Widget build(BuildContext context) {
+    if (!_shownLogged && !_loading && (_resume.isNotEmpty || _latest.isNotEmpty)) {
+      _shownLogged = true;
+      WidgetsBinding.instance.addPostFrameCallback(
+          (_) => perfLog('Home shown ${AppLog.since.elapsedMilliseconds} ms after start'));
+    }
     // Phones: a touch layout in phone sizes, upright or sideways (see _phoneHome).
     if (isPhone(context)) return _phoneHome(context);
     final mq = MediaQuery.of(context);

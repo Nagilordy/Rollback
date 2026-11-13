@@ -105,9 +105,18 @@ class PlayerScreen extends StatefulWidget {
 
 enum _Panel { none, playback, audio, subtitles, info }
 
+/// Loads the video engine (libmpv) the first time a video opens. It used to load while
+/// Rollback started, which made every start slower for something only the player needs.
+bool _videoEngineReady = false;
+void ensureVideoEngine() {
+  if (_videoEngineReady) return;
+  MediaKit.ensureInitialized();
+  _videoEngineReady = true;
+}
+
 class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver {
   // A larger buffer keeps more of the file ready, which helps smoothness and seeking over the network.
-  late final Player player = Player(
+  late final Player player = (ensureVideoEngine(), Player(
     configuration: PlayerConfiguration(
       bufferSize: _phone ? 64 * 1024 * 1024 : 256 * 1024 * 1024,
       // Phones: mpv's warnings too, for the "Why isn't it playing?" box below.
@@ -120,7 +129,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       vo: _hdrLayer ? 'libmpv' : (_surface ? 'gpu-next' : null),
       libass: _surface,
     ),
-  );
+  )).$2;
   static final bool _phone = Platform.isIOS || Platform.isAndroid;
 
   // ---------- Full quality: the video surface (Windows, Linux X11) ----------

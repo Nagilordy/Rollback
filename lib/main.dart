@@ -8,7 +8,6 @@ import 'dart:math' show Random;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -25,14 +24,18 @@ import 'gaming_mode.dart' show inGamingMode;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  MediaKit.ensureInitialized();
-  if (isDesktop) {
-    await windowManager.ensureInitialized();
-    await windowManager.setTitle('Rollback');
-    // SteamOS Gaming Mode: one app at a time, full screen (see gaming_mode.dart).
-    if (inGamingMode) await setFullScreen(true);
-  }
-  await Jellyfin.loadDeviceIdentity();
+  // (The video engine is loaded the first time a video opens, not here: loading it is one of
+  // the slowest parts of starting, and Home doesn't need it. See ensureVideoEngine in player.dart.)
+  // The window and this device's saved identity are got ready at the same time.
+  await Future.wait([
+    if (isDesktop)
+      windowManager.ensureInitialized().then((_) async {
+        unawaited(windowManager.setTitle('Rollback'));
+        // SteamOS Gaming Mode: one app at a time, full screen (see gaming_mode.dart).
+        if (inGamingMode) await setFullScreen(true);
+      }),
+    Jellyfin.loadDeviceIdentity(),
+  ]);
   tidyArtworkCache();
   // Keep more artwork in memory so going back to a card shows it instantly.
   PaintingBinding.instance.imageCache.maximumSizeBytes = 256 * 1024 * 1024;
