@@ -20,7 +20,7 @@ import 'images.dart' show tidyArtworkCache;
 import 'perf.dart';
 import 'profiles.dart' show StartScreen;
 import 'syncplay.dart' show SyncPlay;
-import 'ui.dart' show isDesktop, toggleFullScreen, setFullScreen, keyboardInset;
+import 'ui.dart' show isDesktop, toggleFullScreen, setFullScreen, keyboardInset, kBg;
 import 'gaming_mode.dart' show inGamingMode;
 
 Future<void> main() async {
@@ -172,12 +172,30 @@ Widget _phoneFrame(BuildContext context, Widget child) {
 class _QuickFade extends PageTransitionsBuilder {
   const _QuickFade();
 
+  // Opening a screen: it comes up out of Rollback's dark background. Instead of fading the
+  // whole screen (which redraws it into a see-through layer on every frame: heavy at 4K), a
+  // dark veil on top of it lightens away; drawing a veil costs almost nothing.
+  // Going back: the screen underneath shows straight away.
   @override
   Widget buildTransitions<T>(Route<T> route, BuildContext context, Animation<double> animation,
       Animation<double> secondaryAnimation, Widget child) {
-    return FadeTransition(
-      opacity: CurvedAnimation(parent: animation, curve: const Interval(0, 0.6, curve: Curves.easeOut)),
+    final t = CurvedAnimation(parent: animation, curve: const Interval(0, 0.6, curve: Curves.easeOut));
+    return AnimatedBuilder(
+      animation: animation,
       child: child,
+      builder: (context, child) {
+        if (animation.status == AnimationStatus.reverse) return const SizedBox.shrink();
+        final veil = 1 - t.value;
+        // (Always the same shape, so the screen itself is never rebuilt when the veil is gone.)
+        return Stack(fit: StackFit.passthrough, children: [
+          child!,
+          Positioned.fill(
+            child: veil <= 0
+                ? const SizedBox.shrink()
+                : IgnorePointer(child: ColoredBox(color: kBg.withOpacity(veil))),
+          ),
+        ]);
+      },
     );
   }
 }

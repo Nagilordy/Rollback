@@ -111,7 +111,17 @@ void ANGLESurfaceManager::CleanUp(bool release_context) {
       eglDestroySurface(display_, surface_);
       surface_ = EGL_NO_SURFACE;
     }
-    if (instance_count_ == 1) {
+    if (own_display_) {
+      // Rollback: a display on our own device belongs to this instance alone (see
+      // |CreateEGLDisplay|), so it's always closed with it, and the device let go, or every
+      // video played would keep a Direct3D device (and its graphics memory) alive.
+      eglTerminate(display_);
+      using ReleaseDeviceANGLE = EGLBoolean(EGLAPIENTRY*)(void*);
+      auto release = reinterpret_cast<ReleaseDeviceANGLE>(eglGetProcAddress("eglReleaseDeviceANGLE"));
+      if (release && egl_device_) release(egl_device_);
+      egl_device_ = nullptr;
+      own_display_ = false;
+    } else if (instance_count_ == 1) {
       eglTerminate(display_);
     }
     display_ = EGL_NO_DISPLAY;
@@ -268,12 +278,17 @@ bool ANGLESurfaceManager::CreateEGLDisplay() {
       if (device) {
         display_ = eglGetPlatformDisplayEXT(0x313F /* EGL_PLATFORM_DEVICE_EXT */, device, nullptr);
         if (display_ != EGL_NO_DISPLAY && eglInitialize(display_, 0, 0) == EGL_TRUE) {
+          egl_device_ = device;
+          own_display_ = true;
           std::cout << "media_kit: ANGLESurfaceManager: ANGLE on the app's Direct3D device "
                        "(video decoding can stay on the graphics card)."
                     << std::endl;
           return true;
         }
         display_ = EGL_NO_DISPLAY;
+        using ReleaseDeviceANGLE = EGLBoolean(EGLAPIENTRY*)(void*);
+        auto release = reinterpret_cast<ReleaseDeviceANGLE>(eglGetProcAddress("eglReleaseDeviceANGLE"));
+        if (release) release(device);
       }
     }
     if (eglGetPlatformDisplayEXT) {

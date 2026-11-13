@@ -75,6 +75,10 @@ class ANGLESurfaceManager {
   // Sync |Draw| & |Read| calls.
   HANDLE mutex_ = nullptr;
   // D3D 11
+  // Rollback: the EGL device made from |d3d_11_device_|, when ANGLE runs on it; the display
+  // is then this instance's own (closed with it).
+  void* egl_device_ = nullptr;
+  bool own_display_ = false;
   ID3D11Device* d3d_11_device_ = nullptr;
   ID3D11DeviceContext* d3d_11_device_context_ = nullptr;
   Microsoft::WRL::ComPtr<ID3D11Texture2D> internal_d3d_11_texture_2D_;

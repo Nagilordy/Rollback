@@ -10,10 +10,13 @@
 // the players add their own playback lines (dropped frames, decoder, buffer).
 
 import 'dart:io';
+import 'dart:ui' show PlatformDispatcher;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
+import 'crash_reports.dart' show scrubSecrets;
 import 'ui.dart' show focusLabels, fullScreen;
 
 class AppLog {
@@ -50,6 +53,45 @@ class AppLog {
 
 final perfLog = AppLog('perf');
 
+/// Errors Rollback hit while running (errors-<date>.log): uncaught errors and Flutter's own
+/// error reports, with where they happened, so a crash sweep has something to go on even
+/// without crash reports turned on. Each different error is written in full once per run,
+/// then only counted, so one error repeating every frame can't fill the disk.
+final errorLog = AppLog('errors');
+
+class ErrorRecorder {
+  static final Map<String, int> _seen = {};
+  static int _written = 0;
+
+  static void start() {
+    final flutterBefore = FlutterError.onError;
+    FlutterError.onError = (details) {
+      _record(details.exceptionAsString(), details.stack, details.context?.toDescription());
+      flutterBefore?.call(details);
+    };
+    final platformBefore = PlatformDispatcher.instance.onError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      _record(error.toString(), stack, 'uncaught');
+      return platformBefore?.call(error, stack) ?? true;
+    };
+  }
+
+  static void _record(String message, StackTrace? stack, String? where) {
+    try {
+      final key = message.length > 200 ? message.substring(0, 200) : message;
+      final n = (_seen[key] ?? 0) + 1;
+      _seen[key] = n;
+      if (n == 1 && _written < 50) {
+        _written++;
+        final frames = (stack?.toString() ?? '').split('\n').where((l) => l.trim().isNotEmpty).take(12).join('\n    ');
+        errorLog(scrubSecrets('${where == null ? '' : '[$where] '}$message${frames.isEmpty ? '' : '\n    $frames'}'));
+      } else if (n == 10 || n == 100 || n == 1000) {
+        errorLog(scrubSecrets('(seen $n times) $key'));
+      }
+    } catch (_) {}
+  }
+}
+
 class PerfRecorder {
   static int _frames = 0, _janky = 0;
   static int _maxBuildUs = 0, _maxRasterUs = 0, _sumTotalUs = 0;
@@ -58,6 +100,7 @@ class PerfRecorder {
 
   static void start() {
     perfLog('Rollback ${Platform.operatingSystem} started (log for this run begins here)');
+    ErrorRecorder.start();
     SchedulerBinding.instance.addTimingsCallback(_onTimings);
     WidgetsBinding.instance.waitUntilFirstFrameRasterized.then((_) {
       perfLog('first screen drawn ${AppLog.since.elapsedMilliseconds} ms after start');

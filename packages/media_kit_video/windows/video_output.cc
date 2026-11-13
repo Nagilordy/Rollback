@@ -129,6 +129,14 @@ VideoOutput::~VideoOutput() {
             textures_.clear();
             // S/W
             pixel_buffer_textures_.clear();
+            // Rollback: free the engine's picture first, with its OpenGL context current, while
+            // the context, display and Direct3D device still exist (see below).
+            if (render_context_ != nullptr) {
+              if (surface_manager_ != nullptr) surface_manager_->MakeCurrent(true);
+              mpv_render_context_free(render_context_);
+              render_context_ = nullptr;
+              if (surface_manager_ != nullptr) surface_manager_->MakeCurrent(false);
+            }
             // Free (call destructor) |ANGLESurfaceManager| through the thread
             // pool. This will ensure synchronized EGL or ANGLE usage & won't
             // conflict with |Render| or |CheckAndResize| of other
@@ -142,9 +150,21 @@ VideoOutput::~VideoOutput() {
   promise.get_future().wait();
   texture_id_ = 0;
 
-  thread_pool_ref_->Post([render_context = render_context_]() {
-    mpv_render_context_free(render_context);
-  });
+  // Rollback: normally freed above, before the surface manager. Here only if it wasn't (no
+  // picture was ever shown), still with its context current and waited for.
+  try {
+    if (render_context_ != nullptr) {  // not freed above (no picture was shown)
+      auto freed = thread_pool_ref_->Post([render_context = render_context_, this]() {
+        if (surface_manager_ != nullptr) surface_manager_->MakeCurrent(true);
+        mpv_render_context_free(render_context);
+        if (surface_manager_ != nullptr) surface_manager_->MakeCurrent(false);
+      });
+      freed.wait();
+    }
+  } catch (...) {
+    // The pool is already stopping (Rollback is closing): nothing more to free.
+  }
+  render_context_ = nullptr;
 }
 
 void VideoOutput::NotifyRender() {

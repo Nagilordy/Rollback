@@ -23,8 +23,15 @@
 #include <windows.h>
 #include <shobjidl.h>
 #include <mmsystem.h>
+#include <dbghelp.h>
+#include <shlobj.h>
+#include <psapi.h>
 
 #include <map>
+#include <vector>
+#include <atomic>
+#include <thread>
+#include <mutex>
 #include <optional>
 #include <cstdlib>
 #include <memory>
@@ -222,45 +229,192 @@ static bool SetFullScreen(HWND frame, bool on) {
   return true;
 }
 
+// ---------- Crash log (Windows) ----------
+//
+// If Rollback crashes (in its own code, the video engine or a driver), Windows calls this just
+// before the app closes. It writes what happened to %APPDATA%\Rollback\logs\crash-<date>.log:
+// the kind of crash, and in which program file and where in it (for example libmpv-2.dll
+// +0x1a2b3c), plus a small crash dump (crash-<date-time>.dmp, a few MB) that shows exactly
+// where it stopped. Nothing is sent anywhere. Then Windows' usual handling continues.
+static LPTOP_LEVEL_EXCEPTION_FILTER g_previous_filter = nullptr;
+
+static LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
+  static volatile LONG once = 0;
+  if (InterlockedExchange(&once, 1) == 0) {
+    wchar_t folder[MAX_PATH] = L"";
+    if (SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_APPDATA, nullptr, 0, folder))) {
+      wcscat_s(folder, L"\\Rollback\\logs");
+      SHCreateDirectoryExW(nullptr, folder, nullptr);
+      SYSTEMTIME t;
+      GetLocalTime(&t);
+      const DWORD code = info && info->ExceptionRecord ? info->ExceptionRecord->ExceptionCode : 0;
+      void* address = info && info->ExceptionRecord ? info->ExceptionRecord->ExceptionAddress : nullptr;
+      wchar_t module_path[MAX_PATH] = L"?";
+      HMODULE module = nullptr;
+      if (address && GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                            GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                                        static_cast<LPCWSTR>(address), &module)) {
+        GetModuleFileNameW(module, module_path, MAX_PATH);
+      }
+      const wchar_t* module_name = wcsrchr(module_path, L'\\');
+      module_name = module_name ? module_name + 1 : module_path;
+      const unsigned long long offset =
+          module ? static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(address) -
+                                                   reinterpret_cast<uintptr_t>(module))
+                 : 0;
+      PROCESS_MEMORY_COUNTERS memory{};
+      GetProcessMemoryInfo(GetCurrentProcess(), &memory, sizeof(memory));
+      wchar_t line[1024];
+      swprintf_s(line, L"%04u-%02u-%02u %02u:%02u:%02u  Rollback crashed: code 0x%08lX in %s +0x%llX "
+                 L"(thread %lu, memory %llu MB)\r\n",
+                 t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, code, module_name, offset,
+                 GetCurrentThreadId(), static_cast<unsigned long long>(memory.WorkingSetSize >> 20));
+      wchar_t path[MAX_PATH];
+      swprintf_s(path, L"%s\\crash-%04u-%02u-%02u.log", folder, t.wYear, t.wMonth, t.wDay);
+      HANDLE file = CreateFileW(path, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr, OPEN_ALWAYS,
+                                FILE_ATTRIBUTE_NORMAL, nullptr);
+      if (file != INVALID_HANDLE_VALUE) {
+        char utf8[2048];
+        const int n = WideCharToMultiByte(CP_UTF8, 0, line, -1, utf8, sizeof(utf8), nullptr, nullptr);
+        DWORD written = 0;
+        if (n > 1) WriteFile(file, utf8, n - 1, &written, nullptr);
+        CloseHandle(file);
+      }
+      swprintf_s(path, L"%s\\crash-%04u-%02u-%02u-%02u%02u%02u.dmp", folder, t.wYear, t.wMonth, t.wDay,
+                 t.wHour, t.wMinute, t.wSecond);
+      HANDLE dump = CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+      if (dump != INVALID_HANDLE_VALUE) {
+        MINIDUMP_EXCEPTION_INFORMATION exception{GetCurrentThreadId(), info, FALSE};
+        MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), dump,
+                          static_cast<MINIDUMP_TYPE>(MiniDumpWithThreadInfo | MiniDumpWithUnloadedModules),
+                          info ? &exception : nullptr, nullptr, nullptr);
+        CloseHandle(dump);
+      }
+    }
+  }
+  return g_previous_filter ? g_previous_filter(info) : EXCEPTION_CONTINUE_SEARCH;
+}
+
 // ---------- PlayStation controllers (Windows) ----------
 //
 // The controller library Rollback uses on Windows (gamepads, through Microsoft's GameInput) only
 // sees Xbox-style controllers, so a PS5 or PS4 controller did nothing. Windows' own joystick
 // API (winmm) sees them, over USB and Bluetooth, with no extra driver. Sony controllers (vendor
-// 0x054C) are read here about 60 times a second and each change is sent to Rollback, which
-// treats them like its other controllers. (Xbox controllers stay with the library.)
+// 0x054C) are read here and each change is sent to Rollback, which treats them like its other
+// controllers. (Xbox controllers stay with the library.)
+//
+// The reading happens on its own thread: looking for controllers through winmm can take a long
+// time (Windows goes through every input device), and on the app's main thread that froze the
+// whole app for seconds, controller included. Changes are handed to the main thread with a
+// window message. New controllers are looked for when Windows says a device was plugged in or
+// removed (WM_DEVICECHANGE), and every 15 s just in case.
 struct PadState {
   DWORD buttons = 0;
   DWORD pov = JOY_POVCENTERED;
   int lx = 0, ly = 0;  // -100..100, rounded so tiny resting movements aren't sent
 };
-static std::map<UINT, PadState> g_pads;  // joystick id -> last state sent
-static DWORD g_last_scan = 0;
-const UINT_PTR kPadTimerId = 0xF7A40;
+struct PadEvent {
+  UINT id;
+  bool gone;
+  PadState state;
+};
+static std::mutex g_pad_mutex;
+static std::vector<PadEvent> g_pad_events;  // waiting for the main thread
+static std::atomic<bool> g_pad_run{false};
+static std::atomic<bool> g_pad_rescan{true};
+static std::thread g_pad_thread;
+static std::atomic<HWND> g_pad_window{nullptr};
+const UINT kPadMessage = WM_APP + 0x3A1;
 
-static int Axis(DWORD v, DWORD lo, DWORD hi) {
+static int Axis(DWORD v, UINT lo, UINT hi) {
   if (hi <= lo) return 0;
   const double t = (static_cast<double>(v) - lo) / (hi - lo) * 2.0 - 1.0;  // -1..1
   return static_cast<int>(t * 100.0 + (t < 0 ? -0.5 : 0.5));
 }
 
+static void PadThread() {
+  struct Pad {
+    PadState last;
+    JOYCAPSW caps;
+  };
+  std::map<UINT, Pad> pads;
+  ULONGLONG last_scan = 0;
+  while (g_pad_run) {
+    const ULONGLONG now = GetTickCount64();
+    std::vector<PadEvent> out;
+    if (g_pad_rescan.exchange(false) || now - last_scan > 15000) {
+      last_scan = now;
+      const UINT count = joyGetNumDevs();
+      for (UINT id = 0; id < count && id < 16 && g_pad_run; id++) {
+        if (pads.count(id)) continue;
+        JOYCAPSW caps{};
+        if (joyGetDevCapsW(id, &caps, sizeof(caps)) != JOYERR_NOERROR || caps.wMid != 0x054C) continue;
+        JOYINFOEX info{sizeof(info), JOY_RETURNBUTTONS};
+        if (joyGetPosEx(id, &info) != JOYERR_NOERROR) continue;
+        Pad pad{};
+        pad.caps = caps;
+        pad.last.buttons = info.dwButtons;  // don't fire for buttons already held
+        pads[id] = pad;
+        out.push_back({id, false, pad.last});  // tells Rollback it's there
+      }
+    }
+    for (auto it = pads.begin(); it != pads.end();) {
+      JOYINFOEX info{sizeof(info), JOY_RETURNALL};
+      if (joyGetPosEx(it->first, &info) != JOYERR_NOERROR) {
+        out.push_back({it->first, true, {}});
+        it = pads.erase(it);
+        continue;
+      }
+      const JOYCAPSW& caps = it->second.caps;
+      PadState next;
+      next.buttons = info.dwButtons;
+      next.pov = info.dwPOV;
+      next.lx = Axis(info.dwXpos, caps.wXmin, caps.wXmax);
+      next.ly = Axis(info.dwYpos, caps.wYmin, caps.wYmax);
+      PadState& last = it->second.last;
+      const bool stick_changed = std::abs(next.lx - last.lx) >= 5 || std::abs(next.ly - last.ly) >= 5;
+      if (next.buttons != last.buttons || next.pov != last.pov || stick_changed) {
+        if (!stick_changed) {
+          next.lx = last.lx;
+          next.ly = last.ly;
+        }
+        last = next;
+        out.push_back({it->first, false, next});
+      }
+      ++it;
+    }
+    if (!out.empty()) {
+      {
+        std::lock_guard<std::mutex> lock(g_pad_mutex);
+        g_pad_events.insert(g_pad_events.end(), out.begin(), out.end());
+      }
+      if (HWND window = g_pad_window.load()) PostMessage(window, kPadMessage, 0, 0);
+    }
+    Sleep(pads.empty() ? 100 : 8);  // ~120 times a second while a controller is connected
+  }
+}
+
 class FrameVideoPlugin : public flutter::Plugin {
  public:
   explicit FrameVideoPlugin(flutter::PluginRegistrarWindows* registrar) : registrar_(registrar) {
+    g_previous_filter = SetUnhandledExceptionFilter(CrashFilter);
     channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
         registrar->messenger(), "frame/video", &flutter::StandardMethodCodec::GetInstance());
     channel_->SetMethodCallHandler([this](const auto& call, auto result) { Handle(call, std::move(result)); });
     proc_id_ = registrar->RegisterTopLevelWindowProcDelegate(
         [this](HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) -> std::optional<LRESULT> {
-          if (msg == WM_TIMER && wparam == kPadTimerId) {
-            PollPads();
+          if (msg == kPadMessage) {
+            SendPadEvents();
             return 0;
           }
+          if (msg == WM_DEVICECHANGE) g_pad_rescan = true;  // something plugged in or removed
           return std::nullopt;
         });
   }
   ~FrameVideoPlugin() override {
-    if (pad_window_) KillTimer(pad_window_, kPadTimerId);
+    g_pad_window = nullptr;
+    g_pad_run = false;
+    if (g_pad_thread.joinable()) g_pad_thread.join();
     registrar_->UnregisterTopLevelWindowProcDelegate(proc_id_);
     Close();
   }
@@ -287,11 +441,13 @@ class FrameVideoPlugin : public flutter::Plugin {
     } else if (call.method_name() == "startPads") {
       HWND view = registrar_->GetView() ? registrar_->GetView()->GetNativeWindow() : nullptr;
       HWND frame = view ? GetAncestor(view, GA_ROOT) : nullptr;
-      if (frame && !pad_window_) {
-        pad_window_ = frame;
-        SetTimer(frame, kPadTimerId, 16, nullptr);
+      if (frame && !g_pad_run) {
+        g_pad_window = frame;
+        g_pad_run = true;
+        g_pad_rescan = true;
+        g_pad_thread = std::thread(PadThread);
       }
-      result->Success(flutter::EncodableValue(pad_window_ != nullptr));
+      result->Success(flutter::EncodableValue(g_pad_run.load()));
     } else if (call.method_name() == "refreshFrame") {
       // After leaving full screen, window_manager puts the title bar's style back but doesn't
       // tell Windows the frame changed (no SWP_FRAMECHANGED when the window isn't maximised),
@@ -309,62 +465,29 @@ class FrameVideoPlugin : public flutter::Plugin {
     }
   }
 
-  // Reads every Sony controller and sends what changed: {"id", "buttons", "pov", "lx", "ly"},
+  // Hands what the controller thread read to Rollback: {"id", "buttons", "pov", "lx", "ly"},
   // or {"id", "gone": true} when one disconnects.
-  void PollPads() {
-    const DWORD now = GetTickCount();
-    if (now - g_last_scan > 2000 || g_last_scan == 0) {
-      // Every 2 s: look for newly connected Sony controllers (the slow part, so not every tick).
-      g_last_scan = now;
-      const UINT count = joyGetNumDevs();
-      for (UINT id = 0; id < count && id < 16; id++) {
-        if (g_pads.count(id)) continue;
-        JOYINFOEX info{sizeof(info), JOY_RETURNBUTTONS};
-        if (joyGetPosEx(id, &info) != JOYERR_NOERROR) continue;
-        JOYCAPSW caps{};
-        if (joyGetDevCapsW(id, &caps, sizeof(caps)) != JOYERR_NOERROR || caps.wMid != 0x054C) continue;
-        g_pads[id] = PadState{};
-        g_pads[id].buttons = info.dwButtons;  // don't fire for buttons already held
-      }
+  void SendPadEvents() {
+    std::vector<PadEvent> events;
+    {
+      std::lock_guard<std::mutex> lock(g_pad_mutex);
+      events.swap(g_pad_events);
     }
-    for (auto it = g_pads.begin(); it != g_pads.end();) {
-      const UINT id = it->first;
-      JOYINFOEX info{sizeof(info), JOY_RETURNALL};
-      if (joyGetPosEx(id, &info) != JOYERR_NOERROR) {
-        channel_->InvokeMethod("pad", std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
-                                          {flutter::EncodableValue("id"), flutter::EncodableValue(static_cast<int>(id))},
-                                          {flutter::EncodableValue("gone"), flutter::EncodableValue(true)}}));
-        it = g_pads.erase(it);
-        continue;
+    for (const auto& e : events) {
+      flutter::EncodableMap map{{flutter::EncodableValue("id"), flutter::EncodableValue(static_cast<int>(e.id))}};
+      if (e.gone) {
+        map[flutter::EncodableValue("gone")] = flutter::EncodableValue(true);
+      } else {
+        map[flutter::EncodableValue("buttons")] = flutter::EncodableValue(static_cast<int64_t>(e.state.buttons));
+        map[flutter::EncodableValue("pov")] = flutter::EncodableValue(static_cast<int64_t>(e.state.pov));
+        map[flutter::EncodableValue("lx")] = flutter::EncodableValue(e.state.lx);
+        map[flutter::EncodableValue("ly")] = flutter::EncodableValue(e.state.ly);
       }
-      JOYCAPSW caps{};
-      joyGetDevCapsW(id, &caps, sizeof(caps));
-      PadState next;
-      next.buttons = info.dwButtons;
-      next.pov = info.dwPOV;
-      next.lx = Axis(info.dwXpos, caps.wXmin, caps.wXmax);
-      next.ly = Axis(info.dwYpos, caps.wYmin, caps.wYmax);
-      PadState& last = it->second;
-      const bool stick_changed = std::abs(next.lx - last.lx) >= 5 || std::abs(next.ly - last.ly) >= 5;
-      if (next.buttons != last.buttons || next.pov != last.pov || stick_changed) {
-        if (!stick_changed) {
-          next.lx = last.lx;
-          next.ly = last.ly;
-        }
-        last = next;
-        channel_->InvokeMethod("pad", std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
-                                          {flutter::EncodableValue("id"), flutter::EncodableValue(static_cast<int>(id))},
-                                          {flutter::EncodableValue("buttons"), flutter::EncodableValue(static_cast<int64_t>(next.buttons))},
-                                          {flutter::EncodableValue("pov"), flutter::EncodableValue(static_cast<int64_t>(next.pov))},
-                                          {flutter::EncodableValue("lx"), flutter::EncodableValue(next.lx)},
-                                          {flutter::EncodableValue("ly"), flutter::EncodableValue(next.ly)}}));
-      }
-      ++it;
+      channel_->InvokeMethod("pad", std::make_unique<flutter::EncodableValue>(std::move(map)));
     }
   }
 
   flutter::PluginRegistrarWindows* registrar_;
-  HWND pad_window_ = nullptr;
   int proc_id_ = 0;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
 };

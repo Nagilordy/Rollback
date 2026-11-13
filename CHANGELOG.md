@@ -41,6 +41,19 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   layer, so selecting one no longer redraws the row.
 
 ### Windows
+- **PS5 / PS4 controller ready straight away on Windows:** the controller is now read on its own
+  thread. Looking for controllers could take Windows several seconds, and on the app's main
+  thread that froze Rollback (and the controller) at start-up and every few seconds after.
+  New controllers are found the moment Windows reports them plugged in.
+- **Memory and stability with videos (Windows):** each video's picture is now freed properly
+  when the player closes, and its Direct3D device with it. Before, every video played could
+  leave graphics memory behind, and closing the player could free things in the wrong order.
+- **Opening screens is lighter at 4K:** a new screen now comes up out of a dark veil instead of
+  fading the whole screen, which redrew it into a see-through layer on every frame. Going back
+  is instant.
+- **Crash and error logs (Windows):** if Rollback crashes, crash-<date>.log (what crashed and
+  where) and a small crash dump are written to the logs folder, and errors Rollback runs into
+  go to errors-<date>.log. Nothing is sent anywhere; they're there to send along with a report.
 - **Start screen:** when Rollback takes a moment to start and reach your server, the Rollback
   mark breathes, with soft rings going out like a heartbeat, above "Connecting to" your
   server's name. A quick start goes straight to Home with no added wait.
