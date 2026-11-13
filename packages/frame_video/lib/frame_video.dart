@@ -48,6 +48,20 @@ class FrameVideo {
     }
   }
 
+  /// Windows: starts reading PlayStation controllers (see frame_video_plugin.cpp). [onPad] gets
+  /// each change: {"id", "buttons", "pov", "lx", "ly"}, or {"id", "gone": true}.
+  static Future<bool> startPads(void Function(Map<Object?, Object?> pad) onPad) async {
+    if (!Platform.isWindows) return false;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'pad' && call.arguments is Map) onPad(call.arguments as Map<Object?, Object?>);
+    });
+    try {
+      return await _channel.invokeMethod<bool>('startPads') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<void> refreshFrame() async {
     if (!Platform.isWindows) return;
     try {

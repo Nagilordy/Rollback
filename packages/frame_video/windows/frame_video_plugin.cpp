@@ -22,7 +22,11 @@
 #include <dwmapi.h>
 #include <windows.h>
 #include <shobjidl.h>
+#include <mmsystem.h>
 
+#include <map>
+#include <optional>
+#include <cstdlib>
 #include <memory>
 
 namespace {
@@ -218,14 +222,48 @@ static bool SetFullScreen(HWND frame, bool on) {
   return true;
 }
 
+// ---------- PlayStation controllers (Windows) ----------
+//
+// The controller library Rollback uses on Windows (gamepads, through Microsoft's GameInput) only
+// sees Xbox-style controllers, so a PS5 or PS4 controller did nothing. Windows' own joystick
+// API (winmm) sees them, over USB and Bluetooth, with no extra driver. Sony controllers (vendor
+// 0x054C) are read here about 60 times a second and each change is sent to Rollback, which
+// treats them like its other controllers. (Xbox controllers stay with the library.)
+struct PadState {
+  DWORD buttons = 0;
+  DWORD pov = JOY_POVCENTERED;
+  int lx = 0, ly = 0;  // -100..100, rounded so tiny resting movements aren't sent
+};
+static std::map<UINT, PadState> g_pads;  // joystick id -> last state sent
+static DWORD g_last_scan = 0;
+const UINT_PTR kPadTimerId = 0xF7A40;
+
+static int Axis(DWORD v, DWORD lo, DWORD hi) {
+  if (hi <= lo) return 0;
+  const double t = (static_cast<double>(v) - lo) / (hi - lo) * 2.0 - 1.0;  // -1..1
+  return static_cast<int>(t * 100.0 + (t < 0 ? -0.5 : 0.5));
+}
+
 class FrameVideoPlugin : public flutter::Plugin {
  public:
   explicit FrameVideoPlugin(flutter::PluginRegistrarWindows* registrar) : registrar_(registrar) {
     channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
         registrar->messenger(), "frame/video", &flutter::StandardMethodCodec::GetInstance());
     channel_->SetMethodCallHandler([this](const auto& call, auto result) { Handle(call, std::move(result)); });
+    proc_id_ = registrar->RegisterTopLevelWindowProcDelegate(
+        [this](HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) -> std::optional<LRESULT> {
+          if (msg == WM_TIMER && wparam == kPadTimerId) {
+            PollPads();
+            return 0;
+          }
+          return std::nullopt;
+        });
   }
-  ~FrameVideoPlugin() override { Close(); }
+  ~FrameVideoPlugin() override {
+    if (pad_window_) KillTimer(pad_window_, kPadTimerId);
+    registrar_->UnregisterTopLevelWindowProcDelegate(proc_id_);
+    Close();
+  }
 
  private:
   void Handle(const flutter::MethodCall<flutter::EncodableValue>& call,
@@ -246,6 +284,14 @@ class FrameVideoPlugin : public flutter::Plugin {
       HWND view = registrar_->GetView() ? registrar_->GetView()->GetNativeWindow() : nullptr;
       HWND frame = view ? GetAncestor(view, GA_ROOT) : nullptr;
       result->Success(flutter::EncodableValue(frame && on && SetFullScreen(frame, *on)));
+    } else if (call.method_name() == "startPads") {
+      HWND view = registrar_->GetView() ? registrar_->GetView()->GetNativeWindow() : nullptr;
+      HWND frame = view ? GetAncestor(view, GA_ROOT) : nullptr;
+      if (frame && !pad_window_) {
+        pad_window_ = frame;
+        SetTimer(frame, kPadTimerId, 16, nullptr);
+      }
+      result->Success(flutter::EncodableValue(pad_window_ != nullptr));
     } else if (call.method_name() == "refreshFrame") {
       // After leaving full screen, window_manager puts the title bar's style back but doesn't
       // tell Windows the frame changed (no SWP_FRAMECHANGED when the window isn't maximised),
@@ -263,7 +309,63 @@ class FrameVideoPlugin : public flutter::Plugin {
     }
   }
 
+  // Reads every Sony controller and sends what changed: {"id", "buttons", "pov", "lx", "ly"},
+  // or {"id", "gone": true} when one disconnects.
+  void PollPads() {
+    const DWORD now = GetTickCount();
+    if (now - g_last_scan > 2000 || g_last_scan == 0) {
+      // Every 2 s: look for newly connected Sony controllers (the slow part, so not every tick).
+      g_last_scan = now;
+      const UINT count = joyGetNumDevs();
+      for (UINT id = 0; id < count && id < 16; id++) {
+        if (g_pads.count(id)) continue;
+        JOYINFOEX info{sizeof(info), JOY_RETURNBUTTONS};
+        if (joyGetPosEx(id, &info) != JOYERR_NOERROR) continue;
+        JOYCAPSW caps{};
+        if (joyGetDevCapsW(id, &caps, sizeof(caps)) != JOYERR_NOERROR || caps.wMid != 0x054C) continue;
+        g_pads[id] = PadState{};
+        g_pads[id].buttons = info.dwButtons;  // don't fire for buttons already held
+      }
+    }
+    for (auto it = g_pads.begin(); it != g_pads.end();) {
+      const UINT id = it->first;
+      JOYINFOEX info{sizeof(info), JOY_RETURNALL};
+      if (joyGetPosEx(id, &info) != JOYERR_NOERROR) {
+        channel_->InvokeMethod("pad", std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
+                                          {flutter::EncodableValue("id"), flutter::EncodableValue(static_cast<int>(id))},
+                                          {flutter::EncodableValue("gone"), flutter::EncodableValue(true)}}));
+        it = g_pads.erase(it);
+        continue;
+      }
+      JOYCAPSW caps{};
+      joyGetDevCapsW(id, &caps, sizeof(caps));
+      PadState next;
+      next.buttons = info.dwButtons;
+      next.pov = info.dwPOV;
+      next.lx = Axis(info.dwXpos, caps.wXmin, caps.wXmax);
+      next.ly = Axis(info.dwYpos, caps.wYmin, caps.wYmax);
+      PadState& last = it->second;
+      const bool stick_changed = std::abs(next.lx - last.lx) >= 5 || std::abs(next.ly - last.ly) >= 5;
+      if (next.buttons != last.buttons || next.pov != last.pov || stick_changed) {
+        if (!stick_changed) {
+          next.lx = last.lx;
+          next.ly = last.ly;
+        }
+        last = next;
+        channel_->InvokeMethod("pad", std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
+                                          {flutter::EncodableValue("id"), flutter::EncodableValue(static_cast<int>(id))},
+                                          {flutter::EncodableValue("buttons"), flutter::EncodableValue(static_cast<int64_t>(next.buttons))},
+                                          {flutter::EncodableValue("pov"), flutter::EncodableValue(static_cast<int64_t>(next.pov))},
+                                          {flutter::EncodableValue("lx"), flutter::EncodableValue(next.lx)},
+                                          {flutter::EncodableValue("ly"), flutter::EncodableValue(next.ly)}}));
+      }
+      ++it;
+    }
+  }
+
   flutter::PluginRegistrarWindows* registrar_;
+  HWND pad_window_ = nullptr;
+  int proc_id_ = 0;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
 };
 

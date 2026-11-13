@@ -41,6 +41,10 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   layer, so selecting one no longer redraws the row.
 
 ### Windows
+- **PS5 and PS4 controllers work on Windows** (USB and Bluetooth, no extra driver): the
+  controller library only saw Xbox-style controllers there, so Rollback now reads PlayStation
+  controllers itself through Windows' own joystick support. Same buttons as everywhere else,
+  with the PlayStation symbols in the button guide.
 - **Video decoded by the graphics card stays there:** the picture is now drawn on a Direct3D
   device made with video support, so mpv can hand decoded frames straight to it (`d3d11va`)
   instead of copying each one through memory (`d3d11va-copy`). Less work for small PCs, above

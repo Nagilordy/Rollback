@@ -15,10 +15,12 @@
 // hides it again.
 
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:frame_video/frame_video.dart';
 import 'package:gamepads/gamepads.dart';
 
 import 'banners.dart' show bannerHandlesKey;
@@ -88,6 +90,11 @@ class GamepadInput {
       // a direction held down, scrolling forever.
       Gamepads.onDisconnected.listen((_) => releaseAll());
       _readNames();
+      // Windows: PS5 and PS4 controllers are read by Rollback itself (the library only sees
+      // Xbox-style ones there).
+      if (Platform.isWindows) {
+        FrameVideo.startPads(_onSonyPad).then((ok) => debugPrint('Controller: PlayStation reader ${ok ? 'on' : 'unavailable'}'));
+      }
     } catch (e) {
       debugPrint('Controller support unavailable: $e');
       return;
@@ -224,12 +231,70 @@ class GamepadInput {
 
     if (button != null) {
       // Some controllers report the d-pad as -1 / +1 instead of 0 / 1, so either counts as pressed.
-      final pressed = e.value.abs() > 0.5;
-      if (pressed != _down.contains(button)) debugPrint('Controller: ${button.name} ${pressed ? 'down' : 'up'}');
-      if (pressed == _down.contains(button)) return; // ignore repeats of the same state
-      pressed ? _down.add(button) : _down.remove(button);
-      padActive.value = true;
-      _onButton(button, pressed);
+      _press(button, e.value.abs() > 0.5);
+    }
+  }
+
+  static void _press(GamepadButton button, bool pressed) {
+    if (pressed == _down.contains(button)) return; // ignore repeats of the same state
+    debugPrint('Controller: ${button.name} ${pressed ? 'down' : 'up'}');
+    pressed ? _down.add(button) : _down.remove(button);
+    padActive.value = true;
+    _onButton(button, pressed);
+  }
+
+  // ---------- PS5 / PS4 controllers on Windows (read by frame_video) ----------
+  //
+  // Windows numbers a PlayStation controller's buttons like this (USB and Bluetooth alike):
+  // 0 Square, 1 Cross, 2 Circle, 3 Triangle, 4 L1, 5 R1, 6 L2, 7 R2, 8 Create / Share,
+  // 9 Options, 10 L3, 11 R3, 12 PS, 13 touchpad. The d-pad is a hat, in hundredths of degrees
+  // (0 = up, 9000 = right…, 65535 = released).
+  static const _sonyButtons = {
+    1: GamepadButton.a,
+    2: GamepadButton.b,
+    0: GamepadButton.x,
+    3: GamepadButton.y,
+    4: GamepadButton.leftBumper,
+    5: GamepadButton.rightBumper,
+    6: GamepadButton.leftTrigger,
+    7: GamepadButton.rightTrigger,
+    8: GamepadButton.back,
+    9: GamepadButton.start,
+    13: GamepadButton.touchpad,
+  };
+  static final Set<int> _sonyPads = {};
+
+  static void _onSonyPad(Map<Object?, Object?> pad) {
+    final id = pad['id'] as int? ?? 0;
+    if (pad['gone'] == true) {
+      _sonyPads.remove(id);
+      debugPrint('Controller: PlayStation controller $id disconnected');
+      releaseAll();
+      return;
+    }
+    if (_sonyPads.add(id)) debugPrint('Controller found: PlayStation controller $id (Windows joystick)');
+    if (padStyle.value != PadStyle.playstation) padStyle.value = PadStyle.playstation;
+    final buttons = pad['buttons'] as int? ?? 0;
+    _sonyButtons.forEach((bit, button) => _press(button, buttons & (1 << bit) != 0));
+    final pov = pad['pov'] as int? ?? 65535;
+    final on = pov <= 36000;
+    bool near(int deg) {
+      if (!on) return false;
+      final d = ((pov - deg * 100) % 36000 + 36000) % 36000;
+      return d <= 6750 || d >= 36000 - 6750; // within 67.5°: diagonals count for both
+    }
+
+    _press(GamepadButton.dpadUp, near(0));
+    _press(GamepadButton.dpadRight, near(90));
+    _press(GamepadButton.dpadDown, near(180));
+    _press(GamepadButton.dpadLeft, near(270));
+    // Left stick: -100..100, Windows' down is positive; Rollback's up is positive.
+    final lx = (pad['lx'] as int? ?? 0) / 100.0;
+    final ly = -(pad['ly'] as int? ?? 0) / 100.0;
+    if (lx != _lx || ly != _ly) {
+      _lx = lx;
+      _ly = ly;
+      if (_stickDir != null || _lx.abs() >= 0.6 || _ly.abs() >= 0.6) _onStick();
     }
   }
 
