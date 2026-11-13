@@ -883,14 +883,12 @@ Future<void> showPartyMenu(BuildContext context, Jellyfin jf) {
     barrierColor: const Color(0x9906080B),
     transitionDuration: const Duration(milliseconds: 240),
     pageBuilder: (ctx, _, __) => _PartyMenu(jf: jf, home: context),
-    // Slides in from the right.
-    transitionBuilder: (ctx, a, _, child) => FadeTransition(
-      opacity: CurvedAnimation(parent: a, curve: const Interval(0, 0.6, curve: Curves.easeOut)),
-      child: SlideTransition(
-        position: Tween(begin: const Offset(0.06, 0), end: Offset.zero)
-            .animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
-        child: child,
-      ),
+    // Slides in from just off the right edge, with no fade (fading redrew the panel into a
+    // see-through layer every frame, slow at 4K in full screen; the dimming behind still fades).
+    transitionBuilder: (ctx, a, _, child) => SlideTransition(
+      position: Tween(begin: const Offset(0.4, 0), end: Offset.zero)
+          .animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
+      child: child,
     ),
   );
 }
@@ -1082,14 +1080,12 @@ Future<void> _showSideCard(BuildContext context, Widget Function(BuildContext ct
     barrierColor: const Color(0x9906080B),
     transitionDuration: const Duration(milliseconds: 240),
     pageBuilder: (ctx, _, __) => builder(ctx),
-    // Slides in from the right.
-    transitionBuilder: (ctx, a, _, child) => FadeTransition(
-      opacity: CurvedAnimation(parent: a, curve: const Interval(0, 0.6, curve: Curves.easeOut)),
-      child: SlideTransition(
-        position: Tween(begin: const Offset(0.06, 0), end: Offset.zero)
-            .animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
-        child: child,
-      ),
+    // Slides in from just off the right edge, with no fade (fading redrew the panel into a
+    // see-through layer every frame, slow at 4K in full screen; the dimming behind still fades).
+    transitionBuilder: (ctx, a, _, child) => SlideTransition(
+      position: Tween(begin: const Offset(0.4, 0), end: Offset.zero)
+          .animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
+      child: child,
     ),
   );
 }

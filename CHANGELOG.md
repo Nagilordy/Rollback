@@ -41,6 +41,9 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   layer, so selecting one no longer redraws the row.
 
 ### Windows
+- **Menus open faster in full screen:** the profile menu and the party panels slide in without
+  fading. The fade redrew the whole panel into a see-through layer on every frame, which at 4K
+  made opening them feel slow; the dimming behind them still fades in.
 - **PS5 and PS4 controllers work on Windows** (USB and Bluetooth, no extra driver): the
   controller library only saw Xbox-style controllers there, so Rollback now reads PlayStation
   controllers itself through Windows' own joystick support. Same buttons as everywhere else,
