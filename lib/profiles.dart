@@ -413,6 +413,8 @@ class _StartScreenState extends State<StartScreen> {
   @override
   void initState() {
     super.initState();
+    // Desktop: prepare Home's kinds of drawing while starting (see warmUpDrawing).
+    WidgetsBinding.instance.addPostFrameCallback((_) => warmUpDrawing());
     _splashTimer = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       _splashSince.start();

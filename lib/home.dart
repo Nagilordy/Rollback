@@ -9,6 +9,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -129,6 +130,16 @@ class _HomeScreenState extends State<HomeScreen> {
   int _offlineTry = 0;
   static const _offlineWaits = [2, 3, 5, 10];
 
+  bool _sameAs(List<List<dynamic>> results) {
+    try {
+      return jsonEncode(results[0]) == jsonEncode(_resume) &&
+          jsonEncode(results[1]) == jsonEncode(_latest) &&
+          jsonEncode(results[2]) == jsonEncode(_libraries);
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _load() async {
     Object? failure;
     // A list that fails to load keeps what it showed before (null = failed), instead of
@@ -147,6 +158,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     final results = [loaded[0] ?? _resume, loaded[1] ?? _latest, loaded[2] ?? _libraries];
     final nothing = loaded.every((r) => r == null || r.isEmpty);
+    // Nothing changed (the usual case when coming back): don't rebuild Home at all.
+    if (failure == null && !_loading && _error == null && _sameAs(results)) {
+      _offlineTry = 0;
+      _retriesLeft = 3;
+      Downloads.instance.syncPositions(jf);
+      return;
+    }
     setState(() {
       // Only a real failure is an error (an empty library is not). If a refresh fails while
       // the screen already shows something, keep showing it.
@@ -221,7 +239,18 @@ class _HomeScreenState extends State<HomeScreen> {
     // Watched something from a show: its saved pages (next episode, progress) are out of date.
     final series = item['Type'] == 'Series' ? item['Id'] : item['SeriesId'];
     if (series != null) jf.forgetShow(series.toString());
-    _load();
+    _refreshSoon();
+  }
+
+  // Coming back from a video or another screen: Home first shows what it had, then refreshes
+  // a moment later, so the refresh (new lists, new artwork) doesn't land on the very frames
+  // where Home comes back, which made a visible hitch.
+  Timer? _refreshTimer;
+  void _refreshSoon() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer(const Duration(milliseconds: 700), () {
+      if (mounted) _load();
+    });
   }
 
   // Recently added: a movie opens its page first (Continue watching resumes straight away).
@@ -229,7 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (item?['Type'] != 'Movie') return _open(item);
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => MovieScreen(jf: jf, movie: item)));
     _phoneBack();
-    _load();
+    _refreshSoon();
   }
 
   // Wait until focus rests on a card before loading its backdrop, so holding an arrow key
@@ -279,6 +308,7 @@ class _HomeScreenState extends State<HomeScreen> {
     jf.libraryChanged.removeListener(_libraryChanged);
     SyncPlay.of(jf).stopKeepOpen();
     _featureTimer?.cancel();
+    _refreshTimer?.cancel();
     _profileNode.dispose();
     _playNode.dispose();
     _featuredN.dispose();
@@ -565,7 +595,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => LibraryScreen(jf: jf, libraries: _libraries, library: lib)));
     _phoneBack();
-    _load();
+    _refreshSoon();
     // Came back with L2 from another tab: if nothing on Home is selected, select Play.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final f = FocusManager.instance.primaryFocus;
@@ -1110,30 +1140,25 @@ class _MediaRowState extends State<_MediaRow> {
             child: Stack(children: [
               // Cards fade out softly at both screen edges, without darkening the backdrop
               // behind them: the fade applies to the cards only.
+              // (Only the one or two cards at an edge are faded, each on its own: fading the
+              // whole row meant redrawing it into a see-through layer the size of the screen's
+              // width on every frame a card moved, the main cost of moving around Home at 4K.)
               Positioned.fill(
-                child: LayoutBuilder(builder: (context, box) {
-                  final edge = 110 / box.maxWidth;
-                  return ShaderMask(
-                    blendMode: BlendMode.dstIn,
-                    shaderCallback: (rect) => LinearGradient(
-                      colors: const [Colors.transparent, Colors.white, Colors.white, Colors.transparent],
-                      stops: [0.0, edge, 1 - edge, 1.0],
-                    ).createShader(rect),
-                    child: RepaintBoundary(
-                      child: FocusTraversalGroup(
-                        child: ListView.separated(
-                          controller: _scroll,
-                          scrollDirection: Axis.horizontal,
-                          // Room above and below so the focused card's lift and glow aren't clipped.
-                          padding: const EdgeInsets.fromLTRB(120, 16, 120, 0),
-                          itemCount: items.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 30),
-                          itemBuilder: (_, i) => _card(items[i], i),
-                        ),
-                      ),
+                child: RepaintBoundary(
+                  child: FocusTraversalGroup(
+                    child: ListView.separated(
+                      controller: _scroll,
+                      scrollDirection: Axis.horizontal,
+                      // Room above and below so the focused card's lift and glow aren't clipped.
+                      padding: const EdgeInsets.fromLTRB(120, 16, 120, 0),
+                      itemCount: items.length,
+                      // Each card has its own boundary inside its edge fade (see EdgeFade).
+                      addRepaintBoundaries: false,
+                      separatorBuilder: (_, __) => const SizedBox(width: 30),
+                      itemBuilder: (_, i) => EdgeFade(edge: 110, child: RepaintBoundary(child: _card(items[i], i))),
                     ),
-                  );
-                }),
+                  ),
+                ),
               ),
               // Only the arrows redraw while the row scrolls, not every card.
               Positioned.fill(
@@ -1241,5 +1266,71 @@ class _MediaRowState extends State<_MediaRow> {
         ),
       ),
     );
+  }
+}
+
+/// Fades a card out softly where it reaches the left or right edge of its row, the way a
+/// gradient mask over the whole row would, but only for a card that actually overlaps an
+/// edge (usually one or two per row): every other card is drawn as is, with no extra layer.
+/// [edge] is the width of the fade, in the row's units.
+class EdgeFade extends SingleChildRenderObjectWidget {
+  const EdgeFade({super.key, required this.edge, super.child});
+  final double edge;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderEdgeFade(edge);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderEdgeFade renderObject) => renderObject.edge = edge;
+}
+
+class _RenderEdgeFade extends RenderProxyBox {
+  _RenderEdgeFade(this._edge);
+  double _edge;
+  set edge(double v) {
+    if (v == _edge) return;
+    _edge = v;
+    markNeedsPaint();
+  }
+
+  final _mask = LayerHandle<ShaderMaskLayer>();
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final viewport = RenderAbstractViewport.maybeOf(this);
+    final child = this.child;
+    if (child == null) return;
+    if (viewport is! RenderBox || !hasSize) {
+      _mask.layer = null;
+      context.paintChild(child, offset);
+      return;
+    }
+    final rowWidth = (viewport as RenderBox).size.width;
+    final left = localToGlobal(Offset.zero, ancestor: viewport).dx;
+    final right = left + size.width;
+    if (left >= _edge && right <= rowWidth - _edge) {
+      _mask.layer = null; // fully inside: no fade, no layer
+      context.paintChild(child, offset);
+      return;
+    }
+    // The row's fade, placed so it lines up with the row (this card's own coordinates).
+    final rowRect = Rect.fromLTWH(offset.dx - left, offset.dy, rowWidth, size.height);
+    final e = (_edge / rowWidth).clamp(0.0, 0.5);
+    final layer = _mask.layer ??= ShaderMaskLayer();
+    layer
+      ..shader = LinearGradient(
+        colors: const [Color(0x00FFFFFF), Color(0xFFFFFFFF), Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+        stops: [0.0, e, 1 - e, 1.0],
+      ).createShader(rowRect)
+      // A little larger than the card, so its glow when selected fades with it.
+      ..maskRect = (offset & size).inflate(40)
+      ..blendMode = BlendMode.dstIn;
+    context.pushLayer(layer, (c, o) => c.paintChild(child, o), offset);
+  }
+
+  @override
+  void dispose() {
+    _mask.layer = null;
+    super.dispose();
   }
 }

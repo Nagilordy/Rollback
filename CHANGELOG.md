@@ -41,6 +41,15 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   layer, so selecting one no longer redraws the row.
 
 ### Windows
+- **Moving around Home is much lighter, above all at 4K and in a window:** the soft fade at the
+  ends of each row used to redraw the whole row into a see-through layer on every frame a
+  card moved. Now only the one or two cards at an edge are faded, each on its own.
+- **No more hitch when coming back from a video:** Home first shows what it had, and refreshes
+  Continue Watching a moment later (and not at all if nothing changed), instead of rebuilding
+  on the very frames it comes back.
+- **Smoother first seconds on Home:** while Rollback starts, it quietly prepares each kind of
+  drawing Home uses (rounded artwork, gradients, fades, the soft glow, text), which the
+  graphics card otherwise prepared one by one during Home's first moves.
 - **PS5 / PS4 controller ready straight away on Windows:** the controller is now read on its own
   thread. Looking for controllers could take Windows several seconds, and on the app's main
   thread that froze Rollback (and the controller) at start-up and every few seconds after.

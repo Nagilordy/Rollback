@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'dart:io' show Platform;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,7 +11,7 @@ import 'package:frame_video/frame_video.dart' show FrameVideo;
 import 'package:window_manager/window_manager.dart';
 
 import 'gamepad.dart' show padActive;
-import 'images.dart' show ShadeOverlay;
+import 'images.dart' show ShadeOverlay, logoMatte;
 
 // ---------- Full screen (PC only) ----------
 
@@ -739,5 +740,95 @@ class NavBar extends StatelessWidget {
           tab(lib['Name']?.toString() ?? 'Library', lib['Id'] == currentId, () => onLibrary(lib)),
       ]),
     );
+  }
+}
+
+// ---------- Warming up the graphics (desktop) ----------
+//
+// The first time each kind of drawing is used (rounded pictures, gradients, see-through layers,
+// the soft glow, text in each font…), the graphics card first has to prepare a small program
+// for it, which can take tens of milliseconds each: that was most of Home's stutter in its
+// first 20–30 seconds. This draws one of each, off screen and out of sight, while Rollback
+// starts, so Home's first moves find them ready. Runs once; costs a fraction of a second on
+// the graphics thread, before Home is shown.
+bool _warmedUp = false;
+
+Future<void> warmUpDrawing() async {
+  if (_warmedUp || !isDesktop) return;
+  _warmedUp = true;
+  try {
+    // A small picture to draw, like the artwork.
+    final art = ui.PictureRecorder();
+    Canvas(art).drawRect(const Rect.fromLTWH(0, 0, 64, 96),
+        Paint()..shader = ui.Gradient.linear(Offset.zero, const Offset(64, 96), [const Color(0xFF335577), const Color(0xFF884422)]));
+    final image = await art.endRecording().toImage(64, 96);
+
+    final recorder = ui.PictureRecorder();
+    final c = Canvas(recorder);
+    const box = Rect.fromLTWH(0, 0, 400, 300);
+    // Backdrop and its shading (left and top/bottom gradients, see-through black).
+    c.drawImageRect(image, const Rect.fromLTWH(0, 0, 64, 96), box, Paint()..filterQuality = FilterQuality.low);
+    c.drawImageRect(image, const Rect.fromLTWH(0, 0, 64, 96), box, Paint()..filterQuality = FilterQuality.none);
+    c.drawImageRect(image, const Rect.fromLTWH(0, 0, 64, 96), box, Paint()..filterQuality = FilterQuality.medium);
+    c.drawRect(box, Paint()..shader = kShadeLeft.createShader(box));
+    c.drawRect(box, Paint()..shader = kShadeTopBottom.createShader(box));
+    c.drawRect(box, Paint()..shader = ui.Gradient.radial(box.center, 200, [const Color(0x00000000), const Color(0xCC000000)]));
+    // A card: rounded artwork with its selection ring and lift.
+    final card = RRect.fromRectAndRadius(const Rect.fromLTWH(40, 40, 120, 180), const Radius.circular(18));
+    c.drawRRect(card.inflate(5), Paint()..color = const Color(0x38F4F5F7));
+    c.save();
+    c.clipRRect(card);
+    c.drawImageRect(image, const Rect.fromLTWH(0, 0, 64, 96), card.outerRect, Paint()..filterQuality = FilterQuality.low);
+    c.restore();
+    c.drawRRect(card, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4
+      ..color = kFg);
+    // Cards fading at the row's edge (a gradient mask over a layer).
+    c.saveLayer(const Rect.fromLTWH(200, 40, 160, 180), Paint());
+    c.drawImageRect(image, const Rect.fromLTWH(0, 0, 64, 96), const Rect.fromLTWH(200, 40, 160, 180), Paint());
+    c.drawRect(const Rect.fromLTWH(200, 40, 160, 180), Paint()
+      ..blendMode = BlendMode.dstIn
+      ..shader = ui.Gradient.linear(const Offset(200, 0), const Offset(360, 0), [const Color(0xFFFFFFFF), const Color(0x00FFFFFF)]));
+    c.restore();
+    // Fades (see-through layers) and the soft glow behind logos.
+    c.saveLayer(box, Paint()..color = const Color(0x80FFFFFF));
+    c.drawImage(image, const Offset(10, 10), Paint());
+    c.restore();
+    c.saveLayer(box, Paint()
+      ..colorFilter = const ColorFilter.mode(Color(0x99000000), BlendMode.srcIn)
+      ..imageFilter = ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12));
+    c.drawImage(image, const Offset(100, 100), Paint());
+    c.restore();
+    c.saveLayer(box, Paint()..colorFilter = logoMatte);
+    c.drawImage(image, const Offset(220, 120), Paint());
+    c.restore();
+    // Shadows under panels and dialogs.
+    c.drawRRect(card.shift(const Offset(150, 0)), Paint()
+      ..color = const Color(0x99000000)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20));
+    // Text in Rollback's fonts and the usual weights.
+    var y = 0.0;
+    for (final style in [
+      tvDisplay(44),
+      tvBody(22),
+      tvBody(28, weight: FontWeight.w700),
+      tvBody(19, weight: FontWeight.w600, color: kMuted),
+    ]) {
+      final p = TextPainter(
+        text: TextSpan(text: 'Rollback Continue watching 0123456789 ·', style: style),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: 400);
+      p.paint(c, Offset(0, y));
+      y += p.height;
+      p.dispose();
+    }
+    final picture = recorder.endRecording();
+    final drawn = await picture.toImage(400, 300);
+    drawn.dispose();
+    picture.dispose();
+    image.dispose();
+  } catch (_) {
+    // A warm-up that fails only means the first moves are a little slower, as before.
   }
 }
