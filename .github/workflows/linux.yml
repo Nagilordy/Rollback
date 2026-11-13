@@ -1,4 +1,5 @@
 # Builds Rollback for Linux as one file, Rollback-x86_64.AppImage, that runs on most distributions
+# (and the same app as a plain folder for Steam, Rollback-Steam-Linux.tar.gz)
 # (anything at least as new as Ubuntu 24.04 / Fedora 40, which includes Bazzite).
 # Runs when a release tag like v0.3 is created (it attaches the AppImage to that release), or
 # by hand (Actions tab > Linux AppImage > Run workflow). Uploading files to main doesn't start it.
@@ -152,6 +153,39 @@ jobs:
         with:
           name: Rollback-Linux
           path: Rollback-x86_64.AppImage
+
+      # The same app as a plain folder, the way Steam wants a Linux build (for a Steam depot later,
+      # and for testing now with "Add a non-Steam game"): what's inside the AppImage, unpacked,
+      # with a "rollback" launcher at the top. Packed as .tar.gz so the launcher stays runnable.
+      - name: Pack the plain folder (Steam)
+        run: |
+          rm -rf Rollback && cp -a out/AppDir Rollback
+          cat > Rollback/rollback <<'SH'
+          #!/bin/sh
+          # Starts Rollback from this folder (Steam: point "Add a non-Steam game" at this file).
+          HERE="$(dirname "$(readlink -f "$0")")"
+          export APPDIR="$HERE"
+          exec "$HERE/AppRun" "$@"
+          SH
+          sed -i 's/^          //' Rollback/rollback
+          chmod +x Rollback/rollback Rollback/AppRun
+          cat > Rollback/README.txt <<'TXT'
+          Rollback for Linux and SteamOS, as a plain folder.
+
+          Run it: start the "rollback" file in this folder.
+          Steam (Desktop Mode): Games > Add a Non-Steam Game to My Library > Browse > choose
+          this folder's "rollback" file. It then shows in your library, in Gaming Mode too.
+          Keep the whole folder together: everything Rollback needs is inside it.
+          TXT
+          sed -i 's/^          //' Rollback/README.txt
+          ./Rollback/rollback --version >/dev/null 2>&1 || true
+          tar -czf Rollback-Steam-Linux.tar.gz Rollback
+          ls -la Rollback Rollback-Steam-Linux.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Rollback-Steam-Linux
+          path: Rollback-Steam-Linux.tar.gz
 
       # The release notes: this version's section of CHANGELOG.md.
       - name: Release notes (tags only)
