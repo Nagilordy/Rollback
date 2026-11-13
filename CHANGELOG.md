@@ -41,10 +41,11 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   layer, so selecting one no longer redraws the row.
 
 ### Windows
-- **Start screen:** while Rollback starts and reaches your server, the Rollback mark breathes,
-  with soft rings going out like a heartbeat, above "Connecting to" your server's name. It
-  stays at least one breath, then fades into Home. The same screen shows while Rollback
-  connects to a server you pick on the server screen.
+- **Start screen:** when Rollback takes a moment to start and reach your server, the Rollback
+  mark breathes, with soft rings going out like a heartbeat, above "Connecting to" your
+  server's name. A quick start goes straight to Home with no added wait.
+- **Picking a server:** the card you picked says "Connecting…"; if the server takes more than
+  a second (waking up, or far away), the pulsing Rollback screen takes over until it answers.
 - **Menus open faster in full screen:** the profile menu and the party panels slide in without
   fading. The fade redrew the whole panel into a see-through layer on every frame, which at 4K
   made opening them feel slow; the dimming behind them still fades in.
