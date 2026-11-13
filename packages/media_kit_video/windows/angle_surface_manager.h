@@ -18,7 +18,7 @@
 #include <Windows.h>
 
 #include <d3d.h>
-#include <d3d10.h>
+#include <d3d10_1.h>
 #include <d3d11.h>
 #include <wrl.h>
 
