@@ -992,10 +992,29 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   }
   int get _ticksNow => player.state.position.inMicroseconds * 10;
 
+  void _startEngineLog() {
+    final mpv = player.platform;
+    if (mpv is! NativePlayer) return;
+    try {
+      final now = DateTime.now();
+      final day = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      Directory(AppLog.folder).createSync(recursive: true);
+      mpv.setProperty('msg-level', 'all=info,vd=v,hwdec=v,vo=v,libmpv_render=v,libmpv_gpu=v').catchError((_) {});
+      mpv.setProperty('log-file', '${AppLog.folder}\\mpv-$day.log').catchError((_) {});
+      Timer(const Duration(seconds: 45), () {
+        if (mounted) mpv.setProperty('log-file', '').catchError((_) {});
+      });
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
     openPlayer.value = player;
+    // Windows: the engine's own log, from before the picture is set up (that's when it decides
+    // whether frames decoded by the graphics card can go straight to the picture, d3d11va, or
+    // need a copy, d3d11va-copy) until 30 seconds into the video: mpv-<date>.log beside the perf log.
+    if (Platform.isWindows) _startEngineLog();
     // Phones: video always plays sideways (the screen it came from sets its own again on return).
     if (_phone) phoneSidewaysOnly();
     if (_phone) {
@@ -1345,21 +1364,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       if (Platform.isWindows) {
         try {
           await mpv.setProperty('audio-buffer', '0.5');
-        } catch (_) {}
-      }
-      // Windows: the engine's own log for the first 30 seconds of each video, next to the perf
-      // log (mpv-<date>.log), to see why it decodes on the graphics card with a copy
-      // (d3d11va-copy) instead of handing the frames straight to the picture.
-      if (Platform.isWindows) {
-        try {
-          final now = DateTime.now();
-          final day = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-          Directory(AppLog.folder).createSync(recursive: true);
-          await mpv.setProperty('msg-level', 'all=info,vd=v,hwdec=v,vo=v,libmpv_render=v');
-          await mpv.setProperty('log-file', '${AppLog.folder}\\mpv-$day.log');
-          Timer(const Duration(seconds: 30), () {
-            if (mounted) mpv.setProperty('log-file', '').catchError((_) {});
-          });
         } catch (_) {}
       }
       // Seeks: exact on the PC (the timeline lands where you point, exact);

@@ -35,11 +35,11 @@ dev_dependencies:
 # Community fix for GPU video rendering on Linux with recent Flutter
 # (media-kit issue #1404, pull request #1466). Remove once it ships in a release.
 dependency_overrides:
+  # Our own copy (packages/media_kit_video), from freeKC/media-kit fix-linux-egl, plus a Windows
+  # change: ANGLE runs on a Direct3D device made with video support, so videos decoded by the
+  # graphics card go straight to the picture (d3d11va) instead of a copy (d3d11va-copy).
   media_kit_video:
-    git:
-      url: https://github.com/freeKC/media-kit.git
-      ref: fix-linux-egl
-      path: media_kit_video
+    path: packages/media_kit_video
 
 flutter:
   uses-material-design: true

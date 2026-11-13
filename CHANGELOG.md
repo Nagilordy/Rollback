@@ -41,8 +41,11 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   layer, so selecting one no longer redraws the row.
 
 ### Windows
-- **Video decoded by the graphics card stays there** (the engine is built for it; still being
-  checked: the log should say `d3d11va`, not `d3d11va-copy`).
+- **Video decoded by the graphics card stays there:** the picture is now drawn on a Direct3D
+  device made with video support, so mpv can hand decoded frames straight to it (`d3d11va`)
+  instead of copying each one through memory (`d3d11va-copy`). Less work for small PCs, above
+  all in 4K. The engine log (mpv-<date>.log) now starts before the picture is set up, so it
+  shows why if a PC still falls back to the copy.
 - **Full screen in one step:** Rollback switches with its own window code, in a single move to
   the screen's size and back, instead of passing through several in-between sizes. The window
   keeps its Windows 11 title bar and style the whole time (only hidden while in full screen), so
