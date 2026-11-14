@@ -67,6 +67,11 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
 - **Smoother first seconds on Home:** while Rollback starts, it quietly prepares each kind of
   drawing Home uses (rounded artwork, gradients, fades, the soft glow, text), which the
   graphics card otherwise prepared one by one during Home's first moves.
+- **A PS5 / PS4 controller that's turned off and on again (or loses its Bluetooth link) comes
+  back on its own (Windows):** Rollback now reads PlayStation controllers straight from the
+  controller instead of through Windows' old joystick system, which kept its list of
+  controllers from when Rollback started, so a controller turned off and on often only worked
+  again after restarting Rollback. It's found again within about two seconds.
 - **PS5 / PS4 controller ready straight away on Windows:** the controller is now read on its own
   thread. Looking for controllers could take Windows several seconds, and on the app's main
   thread that froze Rollback (and the controller) at start-up and every few seconds after.

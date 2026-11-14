@@ -26,8 +26,13 @@
 #include <dbghelp.h>
 #include <shlobj.h>
 #include <psapi.h>
+#include <setupapi.h>
+extern "C" {
+#include <hidsdi.h>
+}
 
 #include <map>
+#include <set>
 #include <string>
 #include <algorithm>
 #include <vector>
@@ -324,113 +329,189 @@ static void TidyCrashDumps() {
 // ---------- PlayStation controllers (Windows) ----------
 //
 // The controller library Rollback uses on Windows (gamepads, through Microsoft's GameInput) only
-// sees Xbox-style controllers, so a PS5 or PS4 controller did nothing. Windows' own joystick
-// API (winmm) sees them, over USB and Bluetooth, with no extra driver. Sony controllers (vendor
-// 0x054C) are read here and each change is sent to Rollback, which treats them like its other
-// controllers. (Xbox controllers stay with the library.)
+// sees Xbox-style controllers, so PS5 and PS4 controllers are read here, straight from the
+// controller itself (USB or Bluetooth, no extra driver): Rollback finds every Sony controller
+// (vendor 0x054C) among the PC's input devices, opens it and reads what it sends. A controller
+// that's turned off, runs out of battery or loses its Bluetooth link simply stops; when it's
+// back, it's found again within a couple of seconds (or as soon as Windows says a device was
+// plugged in), with no need to restart Rollback.
 //
-// The reading happens on its own thread: looking for controllers through winmm can take a long
-// time (Windows goes through every input device), and on the app's main thread that froze the
-// whole app for seconds, controller included. Changes are handed to the main thread with a
-// window message. New controllers are looked for when Windows says a device was plugged in or
-// removed (WM_DEVICECHANGE), and every 15 s just in case.
+// (Before, this went through Windows' old joystick system, which keeps its own list of
+// controllers from when the app started: a controller turned off and on again often wasn't
+// seen until Rollback was restarted.)
+//
+// Each controller is read on its own thread, and the finding happens on another, so nothing
+// here can freeze the app. Changes are handed to the main thread with a window message, in
+// the same shape as before: buttons in Windows' joystick order (0 Square, 1 Cross, 2 Circle,
+// 3 Triangle, 4 L1, 5 R1, 6 L2, 7 R2, 8 Create/Share, 9 Options, 10 L3, 11 R3, 12 PS,
+// 13 touchpad), the d-pad as a direction in hundredths of degrees (65535 = released), and the
+// left stick from -100 to 100 (down is positive).
 struct PadState {
   DWORD buttons = 0;
-  DWORD pov = JOY_POVCENTERED;
-  int lx = 0, ly = 0;  // -100..100, rounded so tiny resting movements aren't sent
+  DWORD pov = 65535;
+  int lx = 0, ly = 0;
 };
 struct PadEvent {
   UINT id;
   bool gone;
   PadState state;
 };
-// (Made once and never destroyed: the controller thread isn't waited for when Rollback closes,
-// so these must still exist if it does one last round while the app is shutting down.)
+// (Made once and never destroyed: the controller threads aren't waited for when Rollback
+// closes, so these must still exist if one does a last round while the app is shutting down.)
 static std::mutex& g_pad_mutex = *new std::mutex;
 static std::vector<PadEvent>& g_pad_events = *new std::vector<PadEvent>;  // waiting for the main thread
+static std::set<std::wstring>& g_pad_paths = *new std::set<std::wstring>;  // controllers being read
 static std::atomic<bool> g_pad_run{false};
 static std::atomic<bool> g_pad_rescan{true};
+static std::atomic<UINT> g_pad_next_id{0};
 static std::thread g_pad_thread;
 static std::atomic<HWND> g_pad_window{nullptr};
 const UINT kPadMessage = WM_APP + 0x3A1;
 
-static int Axis(DWORD v, UINT lo, UINT hi) {
-  if (hi <= lo) return 0;
-  const double t = (static_cast<double>(v) - lo) / (hi - lo) * 2.0 - 1.0;  // -1..1
-  return static_cast<int>(t * 100.0 + (t < 0 ? -0.5 : 0.5));
+static void PostPadEvent(const PadEvent& e) {
+  {
+    std::lock_guard<std::mutex> lock(g_pad_mutex);
+    g_pad_events.push_back(e);
+  }
+  if (HWND window = g_pad_window.load()) PostMessage(window, kPadMessage, 0, 0);
+}
+
+static int StickValue(uint8_t v) {
+  const int t = (static_cast<int>(v) - 128) * 100 / 127;
+  return t < -100 ? -100 : (t > 100 ? 100 : t);
+}
+
+// Reads one report from a PS5 (DualSense) or PS4 (DualShock 4) controller. The layouts:
+// DualSense over USB: 0x01 [LX LY RX RY L2 R2 counter B0 B1 B2 …]
+// DualSense over Bluetooth: 0x01 [LX LY RX RY B0 B1 B2 L2 R2] (simple), or
+//   0x31 [seq LX LY RX RY L2 R2 counter B0 B1 B2 …] (full)
+// DualShock 4: 0x01 [LX LY RX RY B0 B1 B2 L2 R2 …] (USB, and Bluetooth simple), or
+//   0x11 [flags flags LX LY RX RY B0 B1 B2 …] (Bluetooth full)
+// B0 = d-pad (low 4 bits, 8 = released) + Square/Cross/Circle/Triangle, B1 = L1 R1 L2 R2
+// Create/Share Options L3 R3, B2 = PS, touchpad.
+static bool ReadSonyReport(const uint8_t* r, DWORD n, bool dualsense, bool usb, PadState* out) {
+  if (n < 10) return false;
+  const uint8_t* stick;
+  uint8_t b0, b1, b2;
+  if (r[0] == 0x01 && dualsense && usb) {
+    if (n < 11) return false;
+    stick = r + 1, b0 = r[8], b1 = r[9], b2 = r[10];
+  } else if (r[0] == 0x01) {
+    stick = r + 1, b0 = r[5], b1 = r[6], b2 = r[7];
+  } else if (r[0] == 0x31 && dualsense) {
+    if (n < 12) return false;
+    stick = r + 2, b0 = r[9], b1 = r[10], b2 = r[11];
+  } else if (r[0] == 0x11 && !dualsense) {
+    stick = r + 3, b0 = r[7], b1 = r[8], b2 = r[9];
+  } else {
+    return false;  // another kind of report (battery, motion…)
+  }
+  out->buttons = (b0 >> 4) | (static_cast<DWORD>(b1) << 4) | (static_cast<DWORD>(b2 & 0x03) << 12);
+  const int dpad = b0 & 0x0F;
+  out->pov = dpad < 8 ? static_cast<DWORD>(dpad) * 4500 : 65535;
+  out->lx = StickValue(stick[0]);
+  out->ly = StickValue(stick[1]);
+  return true;
+}
+
+// Reads one controller until it goes away (turned off, unplugged, out of range).
+static void ReadController(std::wstring path, HANDLE handle, UINT id, bool dualsense, bool usb, USHORT length) {
+  std::vector<uint8_t> report(length > 0 ? length : 128);
+  PadState last;
+  bool announced = false;
+  while (g_pad_run) {
+    DWORD n = 0;
+    if (!ReadFile(handle, report.data(), static_cast<DWORD>(report.size()), &n, nullptr)) break;
+    PadState next;
+    if (!ReadSonyReport(report.data(), n, dualsense, usb, &next)) continue;
+    const bool stick_changed = std::abs(next.lx - last.lx) >= 5 || std::abs(next.ly - last.ly) >= 5;
+    if (!announced || next.buttons != last.buttons || next.pov != last.pov || stick_changed) {
+      if (announced && !stick_changed) {
+        next.lx = last.lx;
+        next.ly = last.ly;
+      }
+      last = next;
+      announced = true;
+      PostPadEvent({id, false, next});  // (the first one also tells Rollback it's there)
+    }
+  }
+  CloseHandle(handle);
+  if (announced) PostPadEvent({id, true, {}});
+  std::lock_guard<std::mutex> lock(g_pad_mutex);
+  g_pad_paths.erase(path);
+}
+
+// Looks through the PC's input devices for Sony game controllers not being read yet, and
+// starts reading each one it finds.
+static void FindControllers() {
+  GUID hid;
+  HidD_GetHidGuid(&hid);
+  HDEVINFO set = SetupDiGetClassDevsW(&hid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+  if (set == INVALID_HANDLE_VALUE) return;
+  SP_DEVICE_INTERFACE_DATA item{sizeof(item)};
+  for (DWORD i = 0; g_pad_run && SetupDiEnumDeviceInterfaces(set, nullptr, &hid, i, &item); i++) {
+    DWORD size = 0;
+    SetupDiGetDeviceInterfaceDetailW(set, &item, nullptr, 0, &size, nullptr);
+    if (size == 0) continue;
+    std::vector<uint8_t> buffer(size);
+    auto* detail = reinterpret_cast<SP_DEVICE_INTERFACE_DETAIL_DATA_W*>(buffer.data());
+    detail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
+    if (!SetupDiGetDeviceInterfaceDetailW(set, &item, detail, size, nullptr, nullptr)) continue;
+    const std::wstring path = detail->DevicePath;
+    {
+      std::lock_guard<std::mutex> lock(g_pad_mutex);
+      if (g_pad_paths.count(path)) continue;
+    }
+    // Who made it (asked without opening it for reading).
+    HANDLE probe = CreateFileW(path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+    if (probe == INVALID_HANDLE_VALUE) continue;
+    HIDD_ATTRIBUTES attributes{sizeof(attributes)};
+    const bool sony = HidD_GetAttributes(probe, &attributes) && attributes.VendorID == 0x054C;
+    CloseHandle(probe);
+    if (!sony) continue;
+    HANDLE handle = CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                nullptr, OPEN_EXISTING, 0, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) {
+      handle = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+                           0, nullptr);
+    }
+    if (handle == INVALID_HANDLE_VALUE) continue;
+    // Only the game controller part (usage page 1, usage 5: game pad).
+    PHIDP_PREPARSED_DATA parsed = nullptr;
+    HIDP_CAPS caps{};
+    bool gamepad = false;
+    if (HidD_GetPreparsedData(handle, &parsed)) {
+      gamepad = HidP_GetCaps(parsed, &caps) == HIDP_STATUS_SUCCESS && caps.UsagePage == 0x01 && caps.Usage == 0x05;
+      HidD_FreePreparsedData(parsed);
+    }
+    if (!gamepad) {
+      CloseHandle(handle);
+      continue;
+    }
+    // PS5 controllers (DualSense 0x0CE6, DualSense Edge 0x0DF2) lay their reports out
+    // differently from PS4 ones; over USB their reports are 64 bytes, over Bluetooth longer.
+    const bool dualsense = attributes.ProductID == 0x0CE6 || attributes.ProductID == 0x0DF2;
+    const bool usb = caps.InputReportByteLength == 64;
+    {
+      std::lock_guard<std::mutex> lock(g_pad_mutex);
+      g_pad_paths.insert(path);
+    }
+    std::thread(ReadController, path, handle, g_pad_next_id++, dualsense, usb, caps.InputReportByteLength).detach();
+  }
+  SetupDiDestroyDeviceInfoList(set);
 }
 
 static void PadThread() {
-  struct Pad {
-    PadState last;
-    JOYCAPSW caps;
-  };
-  std::map<UINT, Pad> pads;
   ULONGLONG last_scan = 0;
-  const ULONGLONG started = GetTickCount64();
   while (g_pad_run) {
     const ULONGLONG now = GetTickCount64();
-    std::vector<PadEvent> out;
-    // Look again every second for the first 15 s while none is found (the first start after
-    // installing, Windows may only list the controller a moment after it's first asked), then
-    // every 15 s, and whenever Windows says a device was plugged in or removed.
-    const ULONGLONG every = (pads.empty() && now - started < 15000) ? 1000 : 15000;
-    const bool device_changed = g_pad_rescan.exchange(false);
-    if (device_changed || now - last_scan > every) {
+    // Looks for controllers when Windows says a device changed, and every 2 s in case it
+    // didn't say (a Bluetooth controller waking up, say).
+    if (g_pad_rescan.exchange(false) || now - last_scan > 2000) {
       last_scan = now;
-      // winmm keeps the list of controllers it read when first used; this makes it read it
-      // again, so a controller connected (or first set up by Windows) later is seen without
-      // restarting Rollback. Only while none is connected, or when Windows says a device
-      // changed: re-reading can renumber controllers, which would make one in use seem to
-      // disconnect and come back for a moment.
-      if (pads.empty() || device_changed) joyConfigChanged(0);
-      const UINT count = joyGetNumDevs();
-      for (UINT id = 0; id < count && id < 16 && g_pad_run; id++) {
-        if (pads.count(id)) continue;
-        JOYCAPSW caps{};
-        if (joyGetDevCapsW(id, &caps, sizeof(caps)) != JOYERR_NOERROR || caps.wMid != 0x054C) continue;
-        JOYINFOEX info{sizeof(info), JOY_RETURNBUTTONS};
-        if (joyGetPosEx(id, &info) != JOYERR_NOERROR) continue;
-        Pad pad{};
-        pad.caps = caps;
-        pad.last.buttons = info.dwButtons;  // don't fire for buttons already held
-        pads[id] = pad;
-        out.push_back({id, false, pad.last});  // tells Rollback it's there
-      }
+      FindControllers();
     }
-    for (auto it = pads.begin(); it != pads.end();) {
-      JOYINFOEX info{sizeof(info), JOY_RETURNALL};
-      if (joyGetPosEx(it->first, &info) != JOYERR_NOERROR) {
-        out.push_back({it->first, true, {}});
-        it = pads.erase(it);
-        continue;
-      }
-      const JOYCAPSW& caps = it->second.caps;
-      PadState next;
-      next.buttons = info.dwButtons;
-      next.pov = info.dwPOV;
-      next.lx = Axis(info.dwXpos, caps.wXmin, caps.wXmax);
-      next.ly = Axis(info.dwYpos, caps.wYmin, caps.wYmax);
-      PadState& last = it->second.last;
-      const bool stick_changed = std::abs(next.lx - last.lx) >= 5 || std::abs(next.ly - last.ly) >= 5;
-      if (next.buttons != last.buttons || next.pov != last.pov || stick_changed) {
-        if (!stick_changed) {
-          next.lx = last.lx;
-          next.ly = last.ly;
-        }
-        last = next;
-        out.push_back({it->first, false, next});
-      }
-      ++it;
-    }
-    if (!out.empty()) {
-      {
-        std::lock_guard<std::mutex> lock(g_pad_mutex);
-        g_pad_events.insert(g_pad_events.end(), out.begin(), out.end());
-      }
-      if (HWND window = g_pad_window.load()) PostMessage(window, kPadMessage, 0, 0);
-    }
-    Sleep(pads.empty() ? 100 : 8);  // ~120 times a second while a controller is connected
+    Sleep(100);
   }
 }
 

@@ -12,6 +12,6 @@ apply_standard_settings(${PLUGIN_NAME})
 set_target_properties(${PLUGIN_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden)
 target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 target_include_directories(${PLUGIN_NAME} INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin comctl32 dwmapi ole32 uuid winmm dbghelp psapi shell32)
+target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin comctl32 dwmapi ole32 uuid winmm dbghelp psapi shell32 hid setupapi)
 
 set(frame_video_bundled_libraries "" PARENT_SCOPE)
