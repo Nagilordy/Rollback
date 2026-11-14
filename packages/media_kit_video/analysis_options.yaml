@@ -1,4 +1,5 @@
-include: package:flutter_lints/flutter.yaml
+# (Rollback: no lint set included here; the app's code check analyses this copy too, and
+# flutter_lints isn't one of the app's packages.)
 analyzer:
   errors:
     dangling_library_doc_comments: ignore
