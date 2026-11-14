@@ -6,7 +6,7 @@
 import 'dart:async';
 import 'dart:convert' show jsonDecode;
 import 'dart:math' as math;
-import 'dart:io' show Directory, Platform;
+import 'dart:io' show Directory, File, Platform;
 
 import 'package:flutter/gestures.dart' show GestureBinding, PointerScrollEvent;
 import 'package:flutter/material.dart';
