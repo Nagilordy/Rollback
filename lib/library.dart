@@ -2396,11 +2396,55 @@ class _ShowScreenState extends State<ShowScreen> {
 
 // Every season of a show in a grid, opened with the "All seasons" button or Triangle / Y.
 // The current season is selected; Cross / A (or a click) opens a season, Circle / B closes.
-class _AllSeasons extends StatelessWidget {
+class _AllSeasons extends StatefulWidget {
   const _AllSeasons({required this.seasons, required this.current, required this.show});
   final List<dynamic> seasons;
   final int current;
   final String show;
+
+  @override
+  State<_AllSeasons> createState() => _AllSeasonsState();
+}
+
+class _AllSeasonsState extends State<_AllSeasons> {
+  List<dynamic> get seasons => widget.seasons;
+  int get current => widget.current;
+  String get show => widget.show;
+
+  // The arrows move around the grid here (one season left/right, one row up/down), always
+  // staying inside this window: left to Flutter's own direction finding, the selection could
+  // slip out to the show page underneath and seem to disappear.
+  late final List<FocusNode> _nodes = [for (var i = 0; i < widget.seasons.length; i++) FocusNode()];
+  int _columns = 6;
+
+  @override
+  void dispose() {
+    for (final n in _nodes) {
+      n.dispose();
+    }
+    super.dispose();
+  }
+
+  KeyEventResult _move(LogicalKeyboardKey key) {
+    final at = _nodes.indexWhere((n) => n.hasFocus);
+    if (at < 0) {
+      if (_nodes.isNotEmpty) focusOn(_nodes[current.clamp(0, _nodes.length - 1)]);
+      return KeyEventResult.handled;
+    }
+    var to = at;
+    if (key == LogicalKeyboardKey.arrowLeft && at % _columns > 0) to = at - 1;
+    if (key == LogicalKeyboardKey.arrowRight && at % _columns < _columns - 1 && at + 1 < _nodes.length) to = at + 1;
+    if (key == LogicalKeyboardKey.arrowUp && at - _columns >= 0) to = at - _columns;
+    if (key == LogicalKeyboardKey.arrowDown) {
+      if (at + _columns < _nodes.length) {
+        to = at + _columns;
+      } else if ((at ~/ _columns) < ((_nodes.length - 1) ~/ _columns)) {
+        to = _nodes.length - 1; // the last row is shorter: go to its last season
+      }
+    }
+    if (to != at) focusOn(_nodes[to]);
+    return KeyEventResult.handled; // never let the arrow leave this window
+  }
 
   String _status(dynamic season) {
     final data = season['UserData'];
@@ -2424,6 +2468,13 @@ class _AllSeasons extends StatelessWidget {
             Navigator.of(context).pop();
             return KeyEventResult.handled;
           }
+          if ((event is KeyDownEvent || event is KeyRepeatEvent) &&
+              (event.logicalKey == LogicalKeyboardKey.arrowUp ||
+                  event.logicalKey == LogicalKeyboardKey.arrowDown ||
+                  event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+                  event.logicalKey == LogicalKeyboardKey.arrowRight)) {
+            return _move(event.logicalKey);
+          }
           return KeyEventResult.ignored;
         },
         child: TvCanvas(
@@ -2446,12 +2497,16 @@ class _AllSeasons extends StatelessWidget {
                   Text('All seasons', style: tvDisplay(48)),
                   const SizedBox(height: 28),
                   Flexible(
-                    child: SingleChildScrollView(
+                    child: LayoutBuilder(builder: (context, box) {
+                      // How many seasons fit on a row (216 wide, 16 apart).
+                      _columns = ((box.maxWidth + 16) / 232).floor().clamp(1, 99);
+                      return SingleChildScrollView(
                       clipBehavior: Clip.none,
                       child: FocusTraversalGroup(
                         child: Wrap(spacing: 16, runSpacing: 16, children: [
                           for (var i = 0; i < seasons.length; i++)
                             Focusable(
+                              focusNode: _nodes[i],
                               autofocus: i == current,
                               scrollAlignment: 0.5,
                               onSelect: () => Navigator.of(context).pop(i),
@@ -2485,7 +2540,8 @@ class _AllSeasons extends StatelessWidget {
                             ),
                         ]),
                       ),
-                    ),
+                    );
+                    }),
                   ),
                 ]),
               ),

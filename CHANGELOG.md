@@ -41,6 +41,10 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   layer, so selecting one no longer redraws the row.
 
 ### Windows
+- **All seasons window: the selection can't slip away anymore.** The arrows and the controller
+  now move around the grid of seasons themselves (one season left or right, one row up or
+  down, the shorter last row included) and always stay inside the window. Before, at some
+  point the selection could slip out to the show page underneath and seem to disappear.
 - **Faster start:** the video engine (the biggest part of Rollback) is now loaded the first
   time a video opens instead of every time Rollback starts, and the window and this device's
   saved details are got ready at the same time instead of one after the other. The perf log
