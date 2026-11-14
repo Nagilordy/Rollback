@@ -55,6 +55,11 @@ class GamepadInput {
   static final Set<String> _touchpads = {};
   static bool _touchpadDown = false;
   static final Set<GamepadButton> _down = {};
+  // Which controller holds which button. Every controller (and each copy of one) keeps its own
+  // presses, so one that disappears, or gets ignored halfway, can't leave a button stuck
+  // "down" and swallow the next presses of the same button on another controller.
+  static final Map<String, Set<GamepadButton>> _downBy = {};
+  static String? _stickFrom; // which controller the stick values came from
   static Timer? _repeat;
   static LogicalKeyboardKey? _held; // direction currently held, from the d-pad or the stick
   static LogicalKeyboardKey? _stickDir;
@@ -70,6 +75,8 @@ class GamepadInput {
   static FocusNode? _lastLogged;
   static LogicalKeyboardKey? _hatDir; // PlayStation d-pad direction held (Windows reader)
   static String? _namesPending;
+  static final Set<String> _listed = {}; // ids the library's controller list has shown
+  static final Map<String, int> _askedAbout = {};
   // Keys some other program types for the controller (Steam's desktop layout turns the d-pad
   // into arrow keys and A / B into Enter / Escape). Rollback already reads the controller, so
   // those copies would move twice, or fight the controller's own presses.
@@ -110,8 +117,17 @@ class GamepadInput {
       }, onError: (_) {});
       // A controller that turns off (or runs out of battery) mid-press would otherwise leave
       // a direction held down, scrolling forever.
-      Gamepads.onDisconnected.listen((_) {
-        releaseAll();
+      Gamepads.onDisconnected.listen((c) {
+        _forget(c.gamepadId);
+        // Linux reads the d-pad as two axes, not buttons: let go of those too.
+        if (_hatV != null) _direction(_hatV!, false);
+        if (_hatH != null) _direction(_hatH!, false);
+        _hatV = null;
+        _hatH = null;
+        _styles.remove(c.gamepadId); // identified again if it comes back
+        _listed.remove(c.gamepadId);
+        _askedAbout.remove(c.gamepadId);
+        if (_downBy.isEmpty) releaseAll();
         _notice('Controller disconnected');
       });
       _readNames();
@@ -176,11 +192,13 @@ class GamepadInput {
   static Future<void> _readNames() async {
     try {
       for (final pad in await Gamepads.list()) {
+        _listed.add(pad.id);
         final name = '${pad.name}'.toLowerCase();
         // The PS5 controller also shows up as a touchpad and a motion sensor. Those aren't
         // for navigating and send updates nonstop, so they're ignored entirely.
         if (['touchpad', 'motion', 'accelerometer', 'gyro'].any(name.contains)) {
           _ignored.add(pad.id);
+          _forget(pad.id);
           if (name.contains('touchpad')) _touchpads.add(pad.id);
           debugPrint('Controller part ignored: ${pad.name}');
           continue;
@@ -195,6 +213,7 @@ class GamepadInput {
         // or stop, so the library's copy is ignored.
         if (sony && Platform.isWindows) {
           _ignored.add(pad.id);
+          _forget(pad.id);
           debugPrint('Controller: ${pad.name} is read by Rollback directly');
           continue;
         }
@@ -212,15 +231,24 @@ class GamepadInput {
     // center, triggers, touchpad, motion sensors). Drop everything that isn't a button or
     // the left stick right away, before doing any work.
     if (_ignored.contains(e.gamepadId)) return;
-    // Windows, a controller not identified yet while a PlayStation one is read directly: it may
-    // be that same controller, so wait until its name is known.
-    if (Platform.isWindows && _sonyPads.isNotEmpty && !_styles.containsKey(e.gamepadId)) {
+    // Windows, a controller not identified yet: it may be a PlayStation controller's copy
+    // (which Rollback reads directly), even while the real one is being unplugged and plugged
+    // back in, so wait until its name is known (a split second).
+    if (Platform.isWindows && !_styles.containsKey(e.gamepadId)) {
       if (_namesPending != e.gamepadId) {
         final id = e.gamepadId;
         _namesPending = id;
+        Future.delayed(const Duration(seconds: 2), () {
+          if (_namesPending == id) _namesPending = null; // ask again later if it's still unknown
+        });
         // Not in the list after all: it's its own controller, so it counts from now on.
+        final tries = _askedAbout[id] = (_askedAbout[id] ?? 0) + 1;
         _readNames().then((_) {
-          if (!_ignored.contains(id)) _styles.putIfAbsent(id, () => PadStyle.xbox);
+          // Not listed yet: ask again on its next press. After a few tries it counts anyway,
+          // so a controller the list never shows still works.
+          if (!_ignored.contains(id) && (_listed.contains(id) || tries >= 3)) {
+            _styles.putIfAbsent(id, () => PadStyle.xbox);
+          }
         });
       }
       return;
@@ -241,6 +269,7 @@ class GamepadInput {
     if (axis != null) {
       if (axis == GamepadAxis.leftStickX) _lx = e.value;
       if (axis == GamepadAxis.leftStickY) _ly = e.value;
+      _stickFrom = e.gamepadId;
       // Resting near the center with no direction held: nothing to do.
       if (_stickDir == null && _lx.abs() < 0.6 && _ly.abs() < 0.6) return;
       _onStick();
@@ -296,7 +325,7 @@ class GamepadInput {
 
     if (button != null) {
       // Some controllers report the d-pad as -1 / +1 instead of 0 / 1, so either counts as pressed.
-      _press(button, e.value.abs() > 0.5);
+      _press(e.gamepadId, button, e.value.abs() > 0.5);
     }
   }
 
@@ -342,13 +371,35 @@ class GamepadInput {
     return echo;
   }
 
-  static void _press(GamepadButton button, bool pressed) {
-    if (pressed == _down.contains(button)) return; // ignore repeats of the same state
-    debugPrint('Controller: ${button.name} ${pressed ? 'down' : 'up'}');
-    pressed ? _down.add(button) : _down.remove(button);
+  static void _press(String from, GamepadButton button, bool pressed) {
+    final mine = _downBy.putIfAbsent(from, () => <GamepadButton>{});
+    if (pressed == mine.contains(button)) return; // ignore repeats of the same state
+    pressed ? mine.add(button) : mine.remove(button);
+    // Pressed if any controller holds it; only a change of that counts as a press or a release.
+    final held = _downBy.values.any((b) => b.contains(button));
+    if (held == _down.contains(button)) return;
+    debugPrint('Controller: ${button.name} ${held ? 'down' : 'up'} ($from)');
+    held ? _down.add(button) : _down.remove(button);
     _lastPadUse = DateTime.now();
     padActive.value = true;
-    _onButton(button, pressed);
+    _onButton(button, held);
+  }
+
+  /// A controller went away (or turned out to be a copy of another): let go of whatever it held,
+  /// without touching what other controllers hold.
+  static void _forget(String from) {
+    final mine = _downBy.remove(from);
+    for (final button in mine ?? const <GamepadButton>{}) {
+      if (_downBy.values.any((b) => b.contains(button))) continue;
+      if (_down.remove(button)) _onButton(button, false);
+    }
+    if (_stickFrom == from) {
+      _stickFrom = null;
+      _lx = 0;
+      _ly = 0;
+      if (_stickDir != null) _onStick();
+    }
+    if (mine != null && mine.isNotEmpty) debugPrint('Controller: let go of ${mine.map((b) => b.name).join(', ')} ($from)');
   }
 
   // ---------- PS5 / PS4 controllers on Windows (read by frame_video) ----------
@@ -377,7 +428,9 @@ class GamepadInput {
     if (pad['gone'] == true) {
       _sonyPads.remove(id);
       debugPrint('Controller: PlayStation controller $id disconnected');
-      releaseAll();
+      _forget('ps$id');
+      _hatDir = null;
+      if (_downBy.isEmpty) releaseAll(); // nothing else connected: start completely fresh
       _notice('PlayStation controller disconnected');
       return;
     }
@@ -393,7 +446,8 @@ class GamepadInput {
         (pad['lx'] as int? ?? 0).abs() >= 60 ||
         (pad['ly'] as int? ?? 0).abs() >= 60;
     if (used && padStyle.value != PadStyle.playstation) padStyle.value = PadStyle.playstation;
-    _sonyButtons.forEach((bit, button) => _press(button, buttons & (1 << bit) != 0));
+    final from = 'ps$id';
+    _sonyButtons.forEach((bit, button) => _press(from, button, buttons & (1 << bit) != 0));
     // The d-pad: one direction at a time. A thumb rolling onto a diagonal (very easy on the
     // PS5 d-pad) keeps the direction already held instead of adding a second one, so Left can't
     // turn into Up halfway through. A diagonal from nothing waits for the real direction.
@@ -412,15 +466,16 @@ class GamepadInput {
     }
     _hatDir = hat == null ? null : _keyOf(hat);
     for (final k in keys) {
-      if (k != hat) _press(k, false); // let go first, so the new direction is the one held
+      if (k != hat) _press(from, k, false); // let go first, so the new direction is the one held
     }
-    if (hat != null) _press(hat, true);
+    if (hat != null) _press(from, hat, true);
     // Left stick: -100..100, Windows' down is positive; Rollback's up is positive.
     final lx = (pad['lx'] as int? ?? 0) / 100.0;
     final ly = -(pad['ly'] as int? ?? 0) / 100.0;
     if (lx != _lx || ly != _ly) {
       _lx = lx;
       _ly = ly;
+      _stickFrom = from;
       if (_stickDir != null || _lx.abs() >= 0.6 || _ly.abs() >= 0.6) _onStick();
     }
   }
@@ -528,6 +583,8 @@ class GamepadInput {
     _lx = 0;
     _ly = 0;
     _down.clear();
+    _downBy.clear();
+    _stickFrom = null;
   }
 
   // The stick counts as a direction once pushed past 60%, and lets go below 35%,

@@ -41,6 +41,12 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   layer, so selecting one no longer redraws the row.
 
 ### Windows
+- **Unplugging or turning off a controller, then reconnecting it, works anywhere, the player
+  included.** Each controller now keeps track of its own buttons, so one that disappears
+  mid-press can't leave a button stuck and make the same button do nothing on the next
+  controller (that's what left the d-pad's Left / Right and Cross dead after a replug). A
+  PlayStation controller that's plugged back in is always found again, even if Windows was
+  still setting it up when Rollback first looked.
 - **The PS5 / PS4 d-pad is steady.** Rolling your thumb onto a diagonal no longer adds a
   second direction (Left turning into Up halfway through a row). A PlayStation controller
   that Windows also hands to the controller library is now read once, not twice. When Steam

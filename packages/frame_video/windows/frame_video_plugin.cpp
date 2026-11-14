@@ -474,8 +474,12 @@ static void FindControllers() {
     HANDLE probe = CreateFileW(path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
     if (probe == INVALID_HANDLE_VALUE) continue;
     HIDD_ATTRIBUTES attributes{sizeof(attributes)};
-    const bool sony = HidD_GetAttributes(probe, &attributes) && attributes.VendorID == 0x054C;
+    const bool known = HidD_GetAttributes(probe, &attributes) != FALSE;
     CloseHandle(probe);
+    // A device that's still starting up (a controller just plugged in) may not answer yet:
+    // asked again at the next search, never written off.
+    if (!known) continue;
+    const bool sony = attributes.VendorID == 0x054C;
     if (!sony) {
       std::lock_guard<std::mutex> lock(g_pad_mutex);
       g_pad_skip.insert(path);
@@ -492,10 +496,12 @@ static void FindControllers() {
     PHIDP_PREPARSED_DATA parsed = nullptr;
     HIDP_CAPS caps{};
     bool gamepad = false;
-    if (HidD_GetPreparsedData(handle, &parsed)) {
-      gamepad = HidP_GetCaps(parsed, &caps) == HIDP_STATUS_SUCCESS && caps.UsagePage == 0x01 && caps.Usage == 0x05;
-      HidD_FreePreparsedData(parsed);
+    if (!HidD_GetPreparsedData(handle, &parsed)) {
+      CloseHandle(handle);  // not ready yet: asked again at the next search
+      continue;
     }
+    gamepad = HidP_GetCaps(parsed, &caps) == HIDP_STATUS_SUCCESS && caps.UsagePage == 0x01 && caps.Usage == 0x05;
+    HidD_FreePreparsedData(parsed);
     if (!gamepad) {
       CloseHandle(handle);
       std::lock_guard<std::mutex> lock(g_pad_mutex);
