@@ -42,6 +42,10 @@ final ValueNotifier<bool> padActive = ValueNotifier(false);
 /// Which symbols to draw in the legend.
 final ValueNotifier<PadStyle> padStyle = ValueNotifier(PadStyle.playstation);
 
+/// "PlayStation controller connected" and the like, when a controller connects or
+/// disconnects while Rollback is open (main.dart shows it as a short notice).
+final ValueNotifier<String?> padNotice = ValueNotifier(null);
+
 // ---------- Reading the controller ----------
 
 class GamepadInput {
@@ -72,7 +76,10 @@ class GamepadInput {
     if (_events != null) return;
     try {
       _events = Gamepads.normalizedEvents.listen(_onEvent, onError: (e) => debugPrint('Controller: $e'));
-      Gamepads.onConnected.listen((_) => _readNames());
+      Gamepads.onConnected.listen((_) {
+        _readNames();
+        _notice('Controller connected');
+      });
       // The touchpad is its own device: its movement is ignored, but a press of it switches
       // full screen, if Linux passes the press to us at all.
       Gamepads.events.listen((e) {
@@ -88,7 +95,10 @@ class GamepadInput {
       }, onError: (_) {});
       // A controller that turns off (or runs out of battery) mid-press would otherwise leave
       // a direction held down, scrolling forever.
-      Gamepads.onDisconnected.listen((_) => releaseAll());
+      Gamepads.onDisconnected.listen((_) {
+        releaseAll();
+        _notice('Controller disconnected');
+      });
       _readNames();
       // Windows: PS5 and PS4 controllers are read by Rollback itself (the library only sees
       // Xbox-style ones there).
@@ -270,9 +280,13 @@ class GamepadInput {
       _sonyPads.remove(id);
       debugPrint('Controller: PlayStation controller $id disconnected');
       releaseAll();
+      _notice('PlayStation controller disconnected');
       return;
     }
-    if (_sonyPads.add(id)) debugPrint('Controller found: PlayStation controller $id (Windows joystick)');
+    if (_sonyPads.add(id)) {
+      debugPrint('Controller found: PlayStation controller $id');
+      _notice('PlayStation controller connected');
+    }
     final buttons = pad['buttons'] as int? ?? 0;
     // The button guide switches to PlayStation symbols when it's used, not just connected
     // (someone may be using an Xbox controller or the keyboard with a PS controller nearby).
@@ -371,6 +385,15 @@ class GamepadInput {
   }
 
   // Lets go of everything: no direction held, no repeat running.
+  // A short notice when a controller connects or disconnects (shown by main.dart, on any
+  // screen, the player included), so you can see it was picked up. Not in the first few
+  // seconds after Rollback starts: the controllers already connected then are expected.
+  static final Stopwatch _since = Stopwatch()..start();
+  static void _notice(String text) {
+    if (_since.elapsed < const Duration(seconds: 4)) return;
+    padNotice.value = text;
+  }
+
   static void releaseAll() {
     _l2 = false;
     _r2 = false;

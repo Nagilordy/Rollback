@@ -22,7 +22,6 @@
 #include <dwmapi.h>
 #include <windows.h>
 #include <shobjidl.h>
-#include <mmsystem.h>
 #include <dbghelp.h>
 #include <shlobj.h>
 #include <psapi.h>
@@ -361,6 +360,9 @@ struct PadEvent {
 static std::mutex& g_pad_mutex = *new std::mutex;
 static std::vector<PadEvent>& g_pad_events = *new std::vector<PadEvent>;  // waiting for the main thread
 static std::set<std::wstring>& g_pad_paths = *new std::set<std::wstring>;  // controllers being read
+// Input devices already checked that aren't PlayStation controllers (keyboard, mouse…), so the
+// search every 2 s doesn't open them again; forgotten when Windows reports a device change.
+static std::set<std::wstring>& g_pad_skip = *new std::set<std::wstring>;
 static std::atomic<bool> g_pad_run{false};
 static std::atomic<bool> g_pad_rescan{true};
 static std::atomic<UINT> g_pad_next_id{0};
@@ -419,11 +421,17 @@ static void ReadController(std::wstring path, HANDLE handle, UINT id, bool duals
   std::vector<uint8_t> report(length > 0 ? length : 128);
   PadState last;
   bool announced = false;
+  // Buttons already held when the controller connects (the PS button that turned it on,
+  // say) don't count as presses until they've been let go once.
+  DWORD held_at_start = 0;
   while (g_pad_run) {
     DWORD n = 0;
     if (!ReadFile(handle, report.data(), static_cast<DWORD>(report.size()), &n, nullptr)) break;
     PadState next;
     if (!ReadSonyReport(report.data(), n, dualsense, usb, &next)) continue;
+    if (!announced) held_at_start = next.buttons;
+    held_at_start &= next.buttons;  // let go: counts again from now on
+    next.buttons &= ~held_at_start;
     const bool stick_changed = std::abs(next.lx - last.lx) >= 5 || std::abs(next.ly - last.ly) >= 5;
     if (!announced || next.buttons != last.buttons || next.pov != last.pov || stick_changed) {
       if (announced && !stick_changed) {
@@ -460,7 +468,7 @@ static void FindControllers() {
     const std::wstring path = detail->DevicePath;
     {
       std::lock_guard<std::mutex> lock(g_pad_mutex);
-      if (g_pad_paths.count(path)) continue;
+      if (g_pad_paths.count(path) || g_pad_skip.count(path)) continue;
     }
     // Who made it (asked without opening it for reading).
     HANDLE probe = CreateFileW(path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -468,7 +476,11 @@ static void FindControllers() {
     HIDD_ATTRIBUTES attributes{sizeof(attributes)};
     const bool sony = HidD_GetAttributes(probe, &attributes) && attributes.VendorID == 0x054C;
     CloseHandle(probe);
-    if (!sony) continue;
+    if (!sony) {
+      std::lock_guard<std::mutex> lock(g_pad_mutex);
+      g_pad_skip.insert(path);
+      continue;
+    }
     HANDLE handle = CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                 nullptr, OPEN_EXISTING, 0, nullptr);
     if (handle == INVALID_HANDLE_VALUE) {
@@ -486,6 +498,8 @@ static void FindControllers() {
     }
     if (!gamepad) {
       CloseHandle(handle);
+      std::lock_guard<std::mutex> lock(g_pad_mutex);
+      g_pad_skip.insert(path);  // another part of a Sony device (not the controls)
       continue;
     }
     // PS5 controllers (DualSense 0x0CE6, DualSense Edge 0x0DF2) lay their reports out
@@ -507,8 +521,13 @@ static void PadThread() {
     const ULONGLONG now = GetTickCount64();
     // Looks for controllers when Windows says a device changed, and every 2 s in case it
     // didn't say (a Bluetooth controller waking up, say).
-    if (g_pad_rescan.exchange(false) || now - last_scan > 2000) {
+    const bool device_changed = g_pad_rescan.exchange(false);
+    if (device_changed || now - last_scan > 2000) {
       last_scan = now;
+      if (device_changed) {
+        std::lock_guard<std::mutex> lock(g_pad_mutex);
+        g_pad_skip.clear();  // something was plugged in or removed: check everything again
+      }
       FindControllers();
     }
     Sleep(100);

@@ -17,6 +17,7 @@ import 'video_surface.dart' show surfacePlayerSkipped;
 import 'gamepad.dart';
 import 'images.dart' show tidyArtworkCache;
 import 'perf.dart';
+import 'player.dart' show openPlayer;
 import 'profiles.dart' show StartScreen;
 import 'syncplay.dart' show SyncPlay;
 import 'ui.dart' show isDesktop, toggleFullScreen, setFullScreen, keyboardInset, kBg;
@@ -58,6 +59,20 @@ class _TestAppState extends State<TestApp> {
   bool _meter = false;
 
   // F2 shows or hides Flutter's performance meter: two graphs of how long each frame takes.
+  // A controller connected or disconnected: a short notice, on any screen (the player too).
+  void _padNotice() {
+    final text = padNotice.value;
+    final ctx = _navigator.currentContext;
+    if (text == null || ctx == null || !ctx.mounted) return;
+    padNotice.value = null;
+    showBanner(ctx,
+        picture: bannerIcon(Icons.sports_esports_rounded),
+        who: text,
+        text: text.endsWith('disconnected') ? 'Turn it back on to carry on' : 'Ready to use',
+        duration: const Duration(seconds: 3),
+        top: openPlayer.value != null ? 72 : 140);
+  }
+
   void _previewSkipped() {
     final why = surfacePlayerSkipped.value;
     final ctx = _navigator.currentContext;
@@ -90,6 +105,7 @@ class _TestAppState extends State<TestApp> {
     HardwareKeyboard.instance.addHandler(_onKey);
     // Rollback's player couldn't be used on this system: say why, once.
     surfacePlayerSkipped.addListener(_previewSkipped);
+    padNotice.addListener(_padNotice);
     GamepadInput.start();
     SyncPlay.navigator = _navigator; // a video someone starts in your party can open from anywhere
   }
@@ -98,6 +114,7 @@ class _TestAppState extends State<TestApp> {
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onKey);
     surfacePlayerSkipped.removeListener(_previewSkipped);
+    padNotice.removeListener(_padNotice);
     super.dispose();
   }
 

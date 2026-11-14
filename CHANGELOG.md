@@ -67,17 +67,16 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
 - **Smoother first seconds on Home:** while Rollback starts, it quietly prepares each kind of
   drawing Home uses (rounded artwork, gradients, fades, the soft glow, text), which the
   graphics card otherwise prepared one by one during Home's first moves.
-- **A PS5 / PS4 controller that's turned off and on again (or loses its Bluetooth link) comes
-  back on its own (Windows):** Rollback now reads PlayStation controllers straight from the
-  controller instead of through Windows' old joystick system, which kept its list of
-  controllers from when Rollback started, so a controller turned off and on often only worked
-  again after restarting Rollback. It's found again within about two seconds.
-- **PS5 / PS4 controller ready straight away on Windows:** the controller is now read on its own
-  thread. Looking for controllers could take Windows several seconds, and on the app's main
-  thread that froze Rollback (and the controller) at start-up and every few seconds after.
-  New controllers are found the moment Windows reports them plugged in, and also on the very
-  first start after installing (Windows only lists a controller to an app once it's asked, so
-  Rollback now asks again, instead of needing a restart).
+- **PS5 / PS4 controllers on Windows are picked up reliably:** Rollback reads them straight from
+  the controller (USB or Bluetooth), in the background, instead of through Windows' old
+  joystick system, which kept its list of controllers from when Rollback started and could
+  freeze the app for seconds while it looked. So a controller works straight away, also on
+  the very first start after installing; one that's turned off, runs out of battery or loses
+  its Bluetooth link comes back on its own within about two seconds (on Home, in the player,
+  anywhere), with no restart; and a button held while it connects (the PS button that turned
+  it on) isn't taken as a press.
+- **A short notice when a controller connects or disconnects,** on any screen, the player
+  included, so you can see it was picked up.
 - **Memory and stability with videos (Windows):** each video's picture is now freed properly
   when the player closes, and its Direct3D device with it. Before, every video played could
   leave graphics memory behind, and closing the player could free things in the wrong order.
@@ -91,8 +90,6 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
 - **No sign-in token in the engine log:** the video engine writes each video's address into
   mpv-<date>.log, and Jellyfin addresses carry the sign-in token. The log is now cleaned (every
   token replaced by "…") as soon as it closes, so it's safe to send along with a report.
-- **A PS controller in use no longer seems to disconnect for a moment:** Windows' controller
-  list is only re-read while no controller is connected, or when Windows reports a change.
 - **Old crash dumps are tidied:** only the 5 newest are kept.
 - **The button guide switches to PlayStation symbols when a PS controller is used,** not just
   because one is connected.
@@ -107,9 +104,9 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   fading. The fade redrew the whole panel into a see-through layer on every frame, which at 4K
   made opening them feel slow; the dimming behind them still fades in.
 - **PS5 and PS4 controllers work on Windows** (USB and Bluetooth, no extra driver): the
-  controller library only saw Xbox-style controllers there, so Rollback now reads PlayStation
-  controllers itself through Windows' own joystick support. Same buttons as everywhere else,
-  with the PlayStation symbols in the button guide.
+  controller library only saw Xbox-style controllers there, so Rollback reads PlayStation
+  controllers itself. Same buttons as everywhere else, with the PlayStation symbols in the
+  button guide.
 - **Video decoded by the graphics card stays there:** the picture is now drawn on a Direct3D
   device made with video support, so mpv can hand decoded frames straight to it (`d3d11va`)
   instead of copying each one through memory (`d3d11va-copy`). Less work for small PCs, above
