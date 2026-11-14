@@ -33,7 +33,9 @@ static void RollbackVideoLog(const char* message) {
   char folder[MAX_PATH] = "";
   DWORD n = ::GetEnvironmentVariableA("APPDATA", folder, MAX_PATH);
   if (n == 0 || n >= MAX_PATH - 40) return;
-  strcat_s(folder, "\\Rollback\\logs");
+  strcat_s(folder, "\\Rollback");
+  ::CreateDirectoryA(folder, nullptr);  // (fails harmlessly if it's already there)
+  strcat_s(folder, "\\logs");
   ::CreateDirectoryA(folder, nullptr);
   SYSTEMTIME t;
   ::GetLocalTime(&t);

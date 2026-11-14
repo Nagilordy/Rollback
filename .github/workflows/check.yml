@@ -1,4 +1,5 @@
-# Checks Rollback's code on every upload to main (and every pull request), in about two minutes:
+# Checks Rollback's code on every upload to main, dev and linux-dev (and every pull request), in
+# about two minutes, so a mistake shows up long before a 25-minute Windows build fails on it:
 # - flutter analyze: finds code that wouldn't build or is likely wrong (errors and warnings fail
 #   the check; style hints don't)
 # - flutter test: the automated tests in test/ (playback rules, tracks, downloads, item text)
@@ -9,7 +10,7 @@ name: Check code
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev, linux-dev]
   pull_request:
   workflow_dispatch:
 

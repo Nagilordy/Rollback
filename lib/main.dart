@@ -178,7 +178,8 @@ class _QuickFade extends PageTransitionsBuilder {
   // Opening a screen: it comes up out of Rollback's dark background. Instead of fading the
   // whole screen (which redraws it into a see-through layer on every frame: heavy at 4K), a
   // dark veil on top of it lightens away; drawing a veil costs almost nothing.
-  // Going back: the screen underneath shows straight away.
+  // Going back: the screen underneath shows straight away. (The leaving screen is hidden, not
+  // removed, so it still closes at the normal moment, when its route is gone.)
   @override
   Widget buildTransitions<T>(Route<T> route, BuildContext context, Animation<double> animation,
       Animation<double> secondaryAnimation, Widget child) {
@@ -187,17 +188,20 @@ class _QuickFade extends PageTransitionsBuilder {
       animation: animation,
       child: child,
       builder: (context, child) {
-        if (animation.status == AnimationStatus.reverse) return const SizedBox.shrink();
-        final veil = 1 - t.value;
+        final leaving = animation.status == AnimationStatus.reverse;
+        final veil = leaving ? 0.0 : 1 - t.value;
         // (Always the same shape, so the screen itself is never rebuilt when the veil is gone.)
-        return Stack(fit: StackFit.passthrough, children: [
-          child!,
-          Positioned.fill(
-            child: veil <= 0
-                ? const SizedBox.shrink()
-                : IgnorePointer(child: ColoredBox(color: kBg.withOpacity(veil))),
-          ),
-        ]);
+        return Offstage(
+          offstage: leaving,
+          child: Stack(fit: StackFit.passthrough, children: [
+            child!,
+            Positioned.fill(
+              child: veil <= 0
+                  ? const SizedBox.shrink()
+                  : IgnorePointer(child: ColoredBox(color: kBg.withOpacity(veil))),
+            ),
+          ]),
+        );
       },
     );
   }

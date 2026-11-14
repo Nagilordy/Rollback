@@ -31,7 +31,7 @@ import 'playback_rules.dart';
 import 'gaming_mode.dart' show inGamingMode;
 import 'package:frame_video/frame_video.dart';
 import 'video_surface.dart' show surfaceWanted, surfacePlayerSkipped, hdrLayerWanted;
-import 'crash_reports.dart' show reportProblem;
+import 'crash_reports.dart' show reportProblem, scrubSecrets;
 import 'downloads.dart' show Downloads;
 
 // ---------- Look (same palette as the home screen) ----------
@@ -107,31 +107,48 @@ enum _Panel { none, playback, audio, subtitles, info }
 
 /// Loads the video engine (libmpv) the first time a video opens. It used to load while
 /// Rollback started, which made every start slower for something only the player needs.
+/// The engine writes each video's address into its log, and Jellyfin addresses carry the
+/// sign-in token (ApiKey=…). Once the log is closed, this rewrites it with every token
+/// replaced by "…" (the same cleaning as the errors log), so a log sent along with a report
+/// can't be used to get into anyone's server.
+Future<void> scrubEngineLog(String path) async {
+  try {
+    final file = File(path);
+    if (!await file.exists()) return;
+    final text = await file.readAsString();
+    final clean = scrubSecrets(text);
+    if (clean != text) await file.writeAsString(clean, flush: true);
+  } catch (_) {}
+}
+
 bool _videoEngineReady = false;
-bool ensureVideoEngine() {
-  if (!_videoEngineReady) {
-    MediaKit.ensureInitialized();
-    _videoEngineReady = true;
-  }
-  return true;
+void ensureVideoEngine() {
+  if (_videoEngineReady) return;
+  MediaKit.ensureInitialized();
+  _videoEngineReady = true;
 }
 
 class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver {
   // A larger buffer keeps more of the file ready, which helps smoothness and seeking over the network.
-  late final Player player = (ensureVideoEngine(), Player(
-    configuration: PlayerConfiguration(
-      bufferSize: _phone ? 64 * 1024 * 1024 : 256 * 1024 * 1024,
-      // Phones: mpv's warnings too, for the "Why isn't it playing?" box below.
-      // (Through the video surface: the engine's info messages too, such as which video and
-      // sound outputs it opened, to find problems on new systems.)
-      logLevel: _surface ? MPVLogLevel.info : (_phone ? MPVLogLevel.warn : MPVLogLevel.error),
-      // Windows and Linux (X11): mpv's best renderer, drawing into the video surface under
-      // Rollback's window (its "wid" is set before the video opens). See "Full quality" below.
-      // Linux (Wayland): the render API, drawn into the HDR layer by frame_video.
-      vo: _hdrLayer ? 'libmpv' : (_surface ? 'gpu-next' : null),
-      libass: _surface,
-    ),
-  )).$2;
+  late final Player player = _makePlayer();
+  Player _makePlayer() {
+    ensureVideoEngine(); // the first video loads the engine (see ensureVideoEngine)
+    return Player(
+      configuration: PlayerConfiguration(
+        bufferSize: _phone ? 64 * 1024 * 1024 : 256 * 1024 * 1024,
+        // Phones: mpv's warnings too, for the "Why isn't it playing?" box below.
+        // (Through the video surface: the engine's info messages too, such as which video and
+        // sound outputs it opened, to find problems on new systems.)
+        logLevel: _surface ? MPVLogLevel.info : (_phone ? MPVLogLevel.warn : MPVLogLevel.error),
+        // Windows and Linux (X11): mpv's best renderer, drawing into the video surface under
+        // Rollback's window (its "wid" is set before the video opens). See "Full quality" below.
+        // Linux (Wayland): the render API, drawn into the HDR layer by frame_video.
+        vo: _hdrLayer ? 'libmpv' : (_surface ? 'gpu-next' : null),
+        libass: _surface,
+      ),
+    );
+  }
+
   static final bool _phone = Platform.isIOS || Platform.isAndroid;
 
   // ---------- Full quality: the video surface (Windows, Linux X11) ----------
@@ -1008,6 +1025,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   bool _engineLogged = !Platform.isWindows;
   late final Future<void> _engineLogReady = Platform.isWindows ? _startEngineLog() : Future.value();
 
+  String? _engineLogPath;
+
   Future<void> _startEngineLog() async {
     final mpv = player.platform;
     try {
@@ -1015,10 +1034,17 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         final now = DateTime.now();
         final day = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
         Directory(AppLog.folder).createSync(recursive: true);
+        final path = '${AppLog.folder}\\mpv-$day.log';
+        _engineLogPath = path;
+        await scrubEngineLog(path); // in case an earlier run closed before cleaning it
         await mpv.setProperty('msg-level', 'all=info,vd=v,hwdec=v,vo=v,libmpv_render=v,libmpv_gpu=v');
-        await mpv.setProperty('log-file', '${AppLog.folder}\\mpv-$day.log');
-        Timer(const Duration(seconds: 45), () {
-          if (mounted) mpv.setProperty('log-file', '').catchError((_) {});
+        await mpv.setProperty('log-file', path);
+        Timer(const Duration(seconds: 45), () async {
+          if (!mounted) return;
+          try {
+            await mpv.setProperty('log-file', '');
+          } catch (_) {}
+          await scrubEngineLog(path);
         });
       }
     } catch (_) {}
@@ -1460,6 +1486,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _adaptTimer?.cancel();
     _dvWatch?.cancel();
     _saveLearnedLevel();
+    // The engine log closes with the engine: clean the tokens out of it shortly after.
+    final logPath = _engineLogPath;
+    if (logPath != null) Future.delayed(const Duration(seconds: 2), () => scrubEngineLog(logPath));
     _room?.dispose();
     widget.sync?.playerClosed(); // still in the party, just not watching
     _failFocus.dispose();

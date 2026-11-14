@@ -28,6 +28,8 @@
 #include <psapi.h>
 
 #include <map>
+#include <string>
+#include <algorithm>
 #include <vector>
 #include <atomic>
 #include <thread>
@@ -295,6 +297,30 @@ static LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
   return g_previous_filter ? g_previous_filter(info) : EXCEPTION_CONTINUE_SEARCH;
 }
 
+// Keeps only the 5 newest crash dumps (a few MB each), so repeated crashes can't slowly fill
+// the disk. Runs once when Rollback starts.
+static void TidyCrashDumps() {
+  wchar_t folder[MAX_PATH] = L"";
+  if (FAILED(SHGetFolderPathW(nullptr, CSIDL_APPDATA, nullptr, 0, folder))) return;
+  wcscat_s(folder, L"\\Rollback\\logs");
+  wchar_t pattern[MAX_PATH];
+  swprintf_s(pattern, L"%s\\crash-*.dmp", folder);
+  WIN32_FIND_DATAW found;
+  HANDLE find = FindFirstFileW(pattern, &found);
+  if (find == INVALID_HANDLE_VALUE) return;
+  std::vector<std::wstring> names;  // crash-YYYY-MM-DD-HHMMSS.dmp: sorting by name sorts by time
+  do {
+    names.push_back(found.cFileName);
+  } while (FindNextFileW(find, &found));
+  FindClose(find);
+  if (names.size() <= 5) return;
+  std::sort(names.begin(), names.end());
+  for (size_t i = 0; i + 5 < names.size(); i++) {
+    std::wstring path = std::wstring(folder) + L"\\" + names[i];
+    DeleteFileW(path.c_str());
+  }
+}
+
 // ---------- PlayStation controllers (Windows) ----------
 //
 // The controller library Rollback uses on Windows (gamepads, through Microsoft's GameInput) only
@@ -349,12 +375,15 @@ static void PadThread() {
     // installing, Windows may only list the controller a moment after it's first asked), then
     // every 15 s, and whenever Windows says a device was plugged in or removed.
     const ULONGLONG every = (pads.empty() && now - started < 15000) ? 1000 : 15000;
-    if (g_pad_rescan.exchange(false) || now - last_scan > every) {
+    const bool device_changed = g_pad_rescan.exchange(false);
+    if (device_changed || now - last_scan > every) {
       last_scan = now;
       // winmm keeps the list of controllers it read when first used; this makes it read it
       // again, so a controller connected (or first set up by Windows) later is seen without
-      // restarting Rollback.
-      joyConfigChanged(0);
+      // restarting Rollback. Only while none is connected, or when Windows says a device
+      // changed: re-reading can renumber controllers, which would make one in use seem to
+      // disconnect and come back for a moment.
+      if (pads.empty() || device_changed) joyConfigChanged(0);
       const UINT count = joyGetNumDevs();
       for (UINT id = 0; id < count && id < 16 && g_pad_run; id++) {
         if (pads.count(id)) continue;
@@ -409,6 +438,7 @@ class FrameVideoPlugin : public flutter::Plugin {
  public:
   explicit FrameVideoPlugin(flutter::PluginRegistrarWindows* registrar) : registrar_(registrar) {
     g_previous_filter = SetUnhandledExceptionFilter(CrashFilter);
+    TidyCrashDumps();
     channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
         registrar->messenger(), "frame/video", &flutter::StandardMethodCodec::GetInstance());
     channel_->SetMethodCallHandler([this](const auto& call, auto result) { Handle(call, std::move(result)); });

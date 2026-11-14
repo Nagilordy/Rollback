@@ -273,8 +273,14 @@ class GamepadInput {
       return;
     }
     if (_sonyPads.add(id)) debugPrint('Controller found: PlayStation controller $id (Windows joystick)');
-    if (padStyle.value != PadStyle.playstation) padStyle.value = PadStyle.playstation;
     final buttons = pad['buttons'] as int? ?? 0;
+    // The button guide switches to PlayStation symbols when it's used, not just connected
+    // (someone may be using an Xbox controller or the keyboard with a PS controller nearby).
+    final used = buttons != 0 ||
+        (pad['pov'] as int? ?? 65535) <= 36000 ||
+        (pad['lx'] as int? ?? 0).abs() >= 60 ||
+        (pad['ly'] as int? ?? 0).abs() >= 60;
+    if (used && padStyle.value != PadStyle.playstation) padStyle.value = PadStyle.playstation;
     _sonyButtons.forEach((bit, button) => _press(button, buttons & (1 << bit) != 0));
     final pov = pad['pov'] as int? ?? 65535;
     final on = pov <= 36000;
