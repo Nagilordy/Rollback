@@ -68,6 +68,21 @@ class GamepadInput {
     GamepadButton.dpadRight,
   };
   static FocusNode? _lastLogged;
+  static LogicalKeyboardKey? _hatDir; // PlayStation d-pad direction held (Windows reader)
+  static String? _namesPending;
+  // Keys some other program types for the controller (Steam's desktop layout turns the d-pad
+  // into arrow keys and A / B into Enter / Escape). Rollback already reads the controller, so
+  // those copies would move twice, or fight the controller's own presses.
+  static final Map<LogicalKeyboardKey, DateTime> _padSentAt = {};
+  static final Map<LogicalKeyboardKey, DateTime> _keyboardAt = {};
+  static final Set<PhysicalKeyboardKey> _echoDown = {};
+  static DateTime _lastPadUse = DateTime(0);
+  static const _echoWindow = Duration(milliseconds: 250);
+  // Mouse movement that isn't the person moving the mouse: the window moving or resizing under a
+  // still cursor (full screen, a monitor change) makes Windows report a jump.
+  static DateTime _ignorePointerUntil = DateTime(0);
+  static DateTime _lastPointerMove = DateTime(0);
+  static Size? _lastViewSize;
 
   static const _firstRepeat = Duration(milliseconds: 380);
   static const _nextRepeat = Duration(milliseconds: 110);
@@ -112,11 +127,23 @@ class GamepadInput {
     // Real mouse use switches back to mouse mode: a click, the wheel, or moving it a good
     // distance. A little drift (a bumped desk, the controller's touchpad) is ignored, so it
     // can't steal focus from the controller.
+    fullScreen.addListener(_windowChanged);
     GestureBinding.instance.pointerRouter.addGlobalRoute((event) {
       if (!padActive.value) return;
+      final now = DateTime.now();
+      final views = WidgetsBinding.instance.platformDispatcher.views;
+      final size = views.isEmpty ? null : views.first.physicalSize;
+      if (size != _lastViewSize) {
+        _lastViewSize = size;
+        _windowChanged();
+      }
       if (event is PointerDownEvent || event is PointerScrollEvent) {
         padActive.value = false;
       } else if (event is PointerHoverEvent || event is PointerMoveEvent) {
+        if (event.synthesized || now.isBefore(_ignorePointerUntil)) return;
+        // It has to be one real movement, not little nudges added up over minutes.
+        if (now.difference(_lastPointerMove) > const Duration(milliseconds: 400)) _drift = 0;
+        _lastPointerMove = now;
         _drift += event.delta.distance;
         if (_drift > 200) padActive.value = false;
       }
@@ -124,10 +151,17 @@ class GamepadInput {
     padActive.addListener(() {
       if (padActive.value) _drift = 0;
     });
-    HardwareKeyboard.instance.addHandler((_) {
-      padActive.value = false;
+    HardwareKeyboard.instance.addHandler((e) {
+      if (!_isEcho(e)) padActive.value = false;
       return false;
     });
+    // Copies of the controller typed by another program never reach the screens.
+    final keyManager = ServicesBinding.instance.keyEventManager;
+    final previous = keyManager.keyMessageHandler;
+    keyManager.keyMessageHandler = (message) {
+      if (message.events.isNotEmpty && message.events.every(_isEcho)) return true;
+      return previous?.call(message) ?? false;
+    };
     // Log what's selected after each change, so a navigation problem shows up in the terminal.
     FocusManager.instance.addListener(() {
       final f = FocusManager.instance.primaryFocus;
@@ -156,6 +190,14 @@ class GamepadInput {
         final sony = !valve &&
             (pad.vendorId == 0x054c ||
                 ['sony', 'playstation', 'dualsense', 'dualshock', 'wireless controller'].any(name.contains));
+        // Windows: Rollback reads PlayStation controllers itself. Newer Windows can also hand
+        // the same controller to the library; two copies of every press made the d-pad skip
+        // or stop, so the library's copy is ignored.
+        if (sony && Platform.isWindows) {
+          _ignored.add(pad.id);
+          debugPrint('Controller: ${pad.name} is read by Rollback directly');
+          continue;
+        }
         _styles[pad.id] = sony ? PadStyle.playstation : PadStyle.xbox;
         final kind = valve ? 'Steam' : (sony ? 'PlayStation' : 'Xbox-style');
         debugPrint('Controller found: ${pad.name} ($kind, vendor ${pad.vendorId})');
@@ -170,6 +212,19 @@ class GamepadInput {
     // center, triggers, touchpad, motion sensors). Drop everything that isn't a button or
     // the left stick right away, before doing any work.
     if (_ignored.contains(e.gamepadId)) return;
+    // Windows, a controller not identified yet while a PlayStation one is read directly: it may
+    // be that same controller, so wait until its name is known.
+    if (Platform.isWindows && _sonyPads.isNotEmpty && !_styles.containsKey(e.gamepadId)) {
+      if (_namesPending != e.gamepadId) {
+        final id = e.gamepadId;
+        _namesPending = id;
+        // Not in the list after all: it's its own controller, so it counts from now on.
+        _readNames().then((_) {
+          if (!_ignored.contains(id)) _styles.putIfAbsent(id, () => PadStyle.xbox);
+        });
+      }
+      return;
+    }
     final axis = e.axis;
     // L2 / R2: pressed past 60%, released below 30% (so a resting finger can't repeat it).
     if (axis == GamepadAxis.leftTrigger || axis == GamepadAxis.rightTrigger) {
@@ -245,10 +300,53 @@ class GamepadInput {
     }
   }
 
+  static void _windowChanged() {
+    _drift = 0;
+    _ignorePointerUntil = DateTime.now().add(const Duration(milliseconds: 800));
+  }
+
+  static const _echoKeys = {
+    LogicalKeyboardKey.arrowUp,
+    LogicalKeyboardKey.arrowDown,
+    LogicalKeyboardKey.arrowLeft,
+    LogicalKeyboardKey.arrowRight,
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.escape,
+  };
+
+  // Whether a keyboard key is really the controller, typed again by another program (Steam).
+  // Only while a controller is being used; a real keyboard always works.
+  static bool isEcho(KeyEvent e) => _isEcho(e);
+  static final Expando<bool> _echoSeen = Expando();
+  static bool _isEcho(KeyEvent e) {
+    final seen = _echoSeen[e];
+    if (seen != null) return seen;
+    bool echo = false;
+    final now = DateTime.now();
+    if (e is KeyUpEvent) {
+      echo = _echoDown.contains(e.physicalKey);
+      if (echo) scheduleMicrotask(() => _echoDown.remove(e.physicalKey));
+    } else if (e is KeyRepeatEvent) {
+      echo = _echoDown.contains(e.physicalKey) || (_held != null && _held == e.logicalKey);
+    } else if (_echoKeys.contains(e.logicalKey) && now.difference(_lastPadUse) < const Duration(seconds: 2)) {
+      final sent = _padSentAt[e.logicalKey];
+      echo = (sent != null && now.difference(sent) < _echoWindow) || _held == e.logicalKey;
+      if (echo) {
+        _echoDown.add(e.physicalKey);
+        debugPrint('Controller: ignored ${e.logicalKey.keyLabel} typed by another program');
+      } else {
+        _keyboardAt[e.logicalKey] = now;
+      }
+    }
+    _echoSeen[e] = echo;
+    return echo;
+  }
+
   static void _press(GamepadButton button, bool pressed) {
     if (pressed == _down.contains(button)) return; // ignore repeats of the same state
     debugPrint('Controller: ${button.name} ${pressed ? 'down' : 'up'}');
     pressed ? _down.add(button) : _down.remove(button);
+    _lastPadUse = DateTime.now();
     padActive.value = true;
     _onButton(button, pressed);
   }
@@ -296,18 +394,27 @@ class GamepadInput {
         (pad['ly'] as int? ?? 0).abs() >= 60;
     if (used && padStyle.value != PadStyle.playstation) padStyle.value = PadStyle.playstation;
     _sonyButtons.forEach((bit, button) => _press(button, buttons & (1 << bit) != 0));
+    // The d-pad: one direction at a time. A thumb rolling onto a diagonal (very easy on the
+    // PS5 d-pad) keeps the direction already held instead of adding a second one, so Left can't
+    // turn into Up halfway through. A diagonal from nothing waits for the real direction.
     final pov = pad['pov'] as int? ?? 65535;
-    final on = pov <= 36000;
-    bool near(int deg) {
-      if (!on) return false;
-      final d = ((pov - deg * 100) % 36000 + 36000) % 36000;
-      return d <= 6750 || d >= 36000 - 6750; // within 67.5°: diagonals count for both
+    final keys = [GamepadButton.dpadUp, GamepadButton.dpadRight, GamepadButton.dpadDown, GamepadButton.dpadLeft];
+    GamepadButton? hat;
+    if (pov <= 36000) {
+      final step = ((pov + 2250) ~/ 4500) % 8; // 0 up, 1 up-right, 2 right… 7 up-left
+      if (step.isEven) {
+        hat = keys[step ~/ 2];
+      } else {
+        final a = keys[step ~/ 2], b = keys[(step ~/ 2 + 1) % 4];
+        final current = _hatDir == null ? null : _dpadOf(_hatDir!);
+        hat = (current == a || current == b) ? current : null;
+      }
     }
-
-    _press(GamepadButton.dpadUp, near(0));
-    _press(GamepadButton.dpadRight, near(90));
-    _press(GamepadButton.dpadDown, near(180));
-    _press(GamepadButton.dpadLeft, near(270));
+    _hatDir = hat == null ? null : _keyOf(hat);
+    for (final k in keys) {
+      if (k != hat) _press(k, false); // let go first, so the new direction is the one held
+    }
+    if (hat != null) _press(hat, true);
     // Left stick: -100..100, Windows' down is positive; Rollback's up is positive.
     final lx = (pad['lx'] as int? ?? 0) / 100.0;
     final ly = -(pad['ly'] as int? ?? 0) / 100.0;
@@ -317,6 +424,19 @@ class GamepadInput {
       if (_stickDir != null || _lx.abs() >= 0.6 || _ly.abs() >= 0.6) _onStick();
     }
   }
+
+  static GamepadButton _dpadOf(LogicalKeyboardKey key) => switch (key) {
+        LogicalKeyboardKey.arrowUp => GamepadButton.dpadUp,
+        LogicalKeyboardKey.arrowRight => GamepadButton.dpadRight,
+        LogicalKeyboardKey.arrowDown => GamepadButton.dpadDown,
+        _ => GamepadButton.dpadLeft,
+      };
+  static LogicalKeyboardKey _keyOf(GamepadButton b) => switch (b) {
+        GamepadButton.dpadUp => LogicalKeyboardKey.arrowUp,
+        GamepadButton.dpadRight => LogicalKeyboardKey.arrowRight,
+        GamepadButton.dpadDown => LogicalKeyboardKey.arrowDown,
+        _ => LogicalKeyboardKey.arrowLeft,
+      };
 
   static void _onButton(GamepadButton button, bool pressed) {
     switch (button) {
@@ -403,6 +523,8 @@ class GamepadInput {
     _stickDir = null;
     _hatV = null;
     _hatH = null;
+    _hatDir = null;
+    _echoDown.clear();
     _lx = 0;
     _ly = 0;
     _down.clear();
@@ -470,6 +592,17 @@ class GamepadInput {
   static void _send(LogicalKeyboardKey key, {bool repeat = false}) {
     // A notification banner with an action (Triangle) comes first, whatever is selected.
     if (!repeat && bannerHandlesKey(key)) return;
+    final now = DateTime.now();
+    _lastPadUse = now;
+    if (!repeat && _echoKeys.contains(key)) {
+      // Another program's copy of this press got here first and already did it.
+      final typed = _keyboardAt.remove(key);
+      _padSentAt[key] = now;
+      if (typed != null && now.difference(typed) < _echoWindow) {
+        debugPrint('Controller: ${key.keyLabel} already typed by another program');
+        return;
+      }
+    }
     final physical = _physical[key]!;
     final time = Duration(milliseconds: DateTime.now().millisecondsSinceEpoch);
     final KeyEvent event = repeat

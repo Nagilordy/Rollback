@@ -90,6 +90,7 @@ class _TestAppState extends State<TestApp> {
   }
 
   bool _onKey(KeyEvent event) {
+    if (GamepadInput.isEcho(event)) return false; // the controller, typed again by Steam
     if (event is KeyDownEvent && bannerHandlesKey(event.logicalKey)) return true;
     if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.f2) {
       setState(() => _meter = !_meter);

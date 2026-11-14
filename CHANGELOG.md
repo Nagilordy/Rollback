@@ -41,6 +41,12 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   layer, so selecting one no longer redraws the row.
 
 ### Windows
+- **The PS5 / PS4 d-pad is steady.** Rolling your thumb onto a diagonal no longer adds a
+  second direction (Left turning into Up halfway through a row). A PlayStation controller
+  that Windows also hands to the controller library is now read once, not twice. When Steam
+  is open and types arrow keys for the controller, those copies are ignored so a press can't
+  move twice. Full screen and window changes no longer count as using the mouse, so the
+  controller keeps the selection.
 - **The window fits the screen, and remembers where you left it:** the first time, Rollback
   opens at about three quarters of the screen's free area, 16:9 and centred (before, Windows'
   default size went past the screen's edges with high display scaling, 150–200%). After that,
