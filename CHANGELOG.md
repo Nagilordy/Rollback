@@ -41,6 +41,9 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   layer, so selecting one no longer redraws the row.
 
 ### Windows
+- **Installer checkboxes no longer cut off on high-resolution screens:** the installer now uses
+  Inno Setup's Windows 11 look, drawn at the screen's scale ("Add a desktop icon" and "Open
+  Rollback" were clipped at 200% scaling).
 - **All seasons window: the selection can't slip away anymore.** The arrows and the controller
   now move around the grid of seasons themselves (one season left or right, one row up or
   down, the shorter last row included) and always stay inside the window. Before, at some
