@@ -41,6 +41,9 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
   layer, so selecting one no longer redraws the row.
 
 ### Windows
+- **The window fits the screen when Rollback opens:** about three quarters of the screen's free
+  area, 16:9 and centred. Before, it opened at Windows' default size, which went past the
+  screen's edges with high display scaling (150–200%).
 - **Installer checkboxes no longer cut off on high-resolution screens:** the installer now uses
   Inno Setup's Windows 11 look, drawn at the screen's scale ("Add a desktop icon" and "Open
   Rollback" were clipped at 200% scaling).

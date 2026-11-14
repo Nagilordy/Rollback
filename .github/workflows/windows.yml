@@ -52,10 +52,16 @@ jobs:
           $t = $t -replace '(VALUE "OriginalFilename", )"[^"]*"', '$1"Rollback.exe"'
           Set-Content $rc $t -NoNewline
           $main = 'windows\runner\main.cpp'
-          (Get-Content $main -Raw) -replace 'window\.Create\(L"[^"]*"', 'window.Create(L"Rollback"' | Set-Content $main -NoNewline
+          $m = (Get-Content $main -Raw) -replace 'window\.Create\(L"[^"]*"', 'window.Create(L"Rollback"'
+          # The first window size: fitted to the screen (packaging/windows/window_size.inc).
+          $fit = Get-Content packaging\windows\window_size.inc -Raw
+          $before = $m
+          $m = [regex]::Replace($m, '\s*Win32Window::Point origin\([^)]*\);\s*Win32Window::Size size\([^)]*\);', "`n$fit")
+          if ($m -eq $before) { throw "main.cpp: the window size lines weren't found" }
+          Set-Content $main $m -NoNewline
           Select-String -Path $cmake -Pattern 'BINARY_NAME'
           Select-String -Path $rc -Pattern 'FileDescription|OriginalFilename'
-          Select-String -Path $main -Pattern 'window.Create'
+          Select-String -Path $main -Pattern 'window.Create|SPI_GETWORKAREA'
 
       # Rollback's own LGPL video engine (libmpv + FFmpeg, packaging/windows/build-lgpl-libmpv.sh),
       # instead of media_kit's, which leaves out Dolby TrueHD and Blu-ray (PGS) subtitles.
