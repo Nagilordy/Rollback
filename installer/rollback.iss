@@ -19,7 +19,10 @@ OutputDir=Output
 OutputBaseFilename=RollbackSetup
 Compression=lzma2
 SolidCompression=yes
-WizardStyle=modern
+; Windows 11 look, drawn by Inno Setup itself at the screen's scale: with the plain style the
+; checkboxes ("Add a desktop icon", "Open Rollback") came out cut off on high-DPI screens
+; (200% scaling and up).
+WizardStyle=modern windows11
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayName=Rollback

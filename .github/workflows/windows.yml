@@ -125,8 +125,10 @@ jobs:
           if ($text -notmatch 'LGPL version' -or $text -match 'nonfree and unredistributable') { throw "$($avutil.Name) is not the LGPL build" }
           "$($avutil.Name): LGPL build"
 
+      # The newest Inno Setup (the runner comes with an older 6.7.x already installed, which
+      # "choco install" would keep).
       - name: Install Inno Setup
-        run: choco install innosetup -y --no-progress
+        run: choco upgrade innosetup -y --no-progress
 
       - name: Make the installer
         shell: pwsh
