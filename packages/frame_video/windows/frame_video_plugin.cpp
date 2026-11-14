@@ -341,11 +341,20 @@ static void PadThread() {
   };
   std::map<UINT, Pad> pads;
   ULONGLONG last_scan = 0;
+  const ULONGLONG started = GetTickCount64();
   while (g_pad_run) {
     const ULONGLONG now = GetTickCount64();
     std::vector<PadEvent> out;
-    if (g_pad_rescan.exchange(false) || now - last_scan > 15000) {
+    // Look again every second for the first 15 s while none is found (the first start after
+    // installing, Windows may only list the controller a moment after it's first asked), then
+    // every 15 s, and whenever Windows says a device was plugged in or removed.
+    const ULONGLONG every = (pads.empty() && now - started < 15000) ? 1000 : 15000;
+    if (g_pad_rescan.exchange(false) || now - last_scan > every) {
       last_scan = now;
+      // winmm keeps the list of controllers it read when first used; this makes it read it
+      // again, so a controller connected (or first set up by Windows) later is seen without
+      // restarting Rollback.
+      joyConfigChanged(0);
       const UINT count = joyGetNumDevs();
       for (UINT id = 0; id < count && id < 16 && g_pad_run; id++) {
         if (pads.count(id)) continue;

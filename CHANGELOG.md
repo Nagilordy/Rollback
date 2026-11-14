@@ -60,7 +60,9 @@ The first version for Windows, and an update for Linux (Linux 0.1 stays as relea
 - **PS5 / PS4 controller ready straight away on Windows:** the controller is now read on its own
   thread. Looking for controllers could take Windows several seconds, and on the app's main
   thread that froze Rollback (and the controller) at start-up and every few seconds after.
-  New controllers are found the moment Windows reports them plugged in.
+  New controllers are found the moment Windows reports them plugged in, and also on the very
+  first start after installing (Windows only lists a controller to an app once it's asked, so
+  Rollback now asks again, instead of needing a restart).
 - **Memory and stability with videos (Windows):** each video's picture is now freed properly
   when the player closes, and its Direct3D device with it. Before, every video played could
   leave graphics memory behind, and closing the player could free things in the wrong order.
