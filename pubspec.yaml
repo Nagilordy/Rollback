@@ -15,6 +15,7 @@ dependencies:
   media_kit_libs_video: ^1.0.5
   shared_preferences: ^2.3.2
   window_manager: ^0.4.3
+  screen_retriever: ^0.2.0 # (comes with window_manager) which screens there are, for window_place.dart
   gamepads: ^0.1.13
   path_provider: ^2.1.4
   # Downloads that keep going with the app closed (iOS background transfers), pause/resume.

@@ -20,6 +20,7 @@ import 'perf.dart';
 import 'player.dart' show openPlayer;
 import 'profiles.dart' show StartScreen;
 import 'syncplay.dart' show SyncPlay;
+import 'window_place.dart' show restoreWindowPlace;
 import 'ui.dart' show isDesktop, toggleFullScreen, setFullScreen, keyboardInset, kBg;
 import 'gaming_mode.dart' show inGamingMode;
 
@@ -32,6 +33,8 @@ Future<void> main() async {
     if (isDesktop)
       windowManager.ensureInitialized().then((_) async {
         unawaited(windowManager.setTitle('Rollback'));
+        // Windows: where and how big you left it (see window_place.dart).
+        await restoreWindowPlace();
         // SteamOS Gaming Mode: one app at a time, full screen (see gaming_mode.dart).
         if (inGamingMode) await setFullScreen(true);
       }),
