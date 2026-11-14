@@ -305,7 +305,7 @@ class GamepadInput {
     _ignorePointerUntil = DateTime.now().add(const Duration(milliseconds: 800));
   }
 
-  static const _echoKeys = {
+  static final _echoKeys = <LogicalKeyboardKey>{
     LogicalKeyboardKey.arrowUp,
     LogicalKeyboardKey.arrowDown,
     LogicalKeyboardKey.arrowLeft,
